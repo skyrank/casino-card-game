@@ -8,6 +8,50 @@
   flex-direction: column;
 }
 
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.game-header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.room-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 16px;
+  color: #555;
+}
+
+.leave-btn {
+  padding: 8px 16px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.leave-btn:hover {
+  background: #da190b;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 24px;
+  color: #666;
+}
+
 .message {
   background: #f0f0f0;
   padding: 12px;
@@ -21,15 +65,26 @@
 .game-board {
   display: flex;
   flex-direction: column;
-  gap: 15px;  /* Reduced from 30px */
+  gap: 15px;
   margin: 15px 0;
   flex: 1;
 }
 
 .player-section {
   background: #e8f4f8;
-  padding: 15px;  /* Reduced from 20px */
+  padding: 15px;
   border-radius: 10px;
+  border: 2px solid transparent;
+}
+
+.my-section {
+  border: 3px solid #4CAF50;
+  background: #e8f5e9 !important;
+}
+
+.opponent-section {
+  border: 3px solid #2196F3;
+  background: #e3f2fd !important;
 }
 
 .player-section h2 {
@@ -68,9 +123,9 @@
 
 .table-section {
   background: #2d5016;
-  padding: 20px;  /* Reduced from 30px */
+  padding: 20px;
   border-radius: 10px;
-  min-height: 160px;  /* Reduced from 200px */
+  min-height: 160px;
 }
 
 .table-section h2 {

@@ -5,10 +5,10 @@ function Card({ rank, suit }) {
   // Helper function to get suit symbol
   const getSuitSymbol = (suit) => {
     const symbols = {
-      'Spade': '♠',
-      'Club': '♣',
-      'Heart': '♥',
-      'Diamond': '♦'
+      'Spade': '\u2660',    // ♠
+      'Club': '\u2663',     // ♣
+      'Heart': '\u2665',    // ♥
+      'Diamond': '\u2666'   // ♦
     };
     return symbols[suit];
   };

@@ -1,0 +1,160 @@
+.lobby-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.lobby-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+}
+
+.lobby-card h1 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 32px;
+}
+
+.error-message {
+  background: #ffebee;
+  border: 2px solid #f44336;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.name-input-section {
+  margin-bottom: 30px;
+}
+
+.name-input-section label,
+.option-section label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.name-input-section input,
+.option-section input {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.name-input-section input:focus,
+.option-section input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.lobby-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.option-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.create-button,
+.join-button {
+  width: 100%;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-button {
+  background: #4CAF50;
+  color: white;
+}
+
+.create-button:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.join-button {
+  background: #2196F3;
+  color: white;
+}
+
+.join-button:hover:not(:disabled) {
+  background: #0b7dda;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.create-button:disabled,
+.join-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.divider {
+  text-align: center;
+  color: #999;
+  font-weight: bold;
+  position: relative;
+  margin: 10px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: #ddd;
+}
+
+.divider::before {
+  left: 0;
+}
+
+.divider::after {
+  right: 0;
+}
+
+.helper-text {
+  font-size: 13px;
+  color: #777;
+  margin: 0;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .lobby-card {
+    padding: 30px 20px;
+  }
+  
+  .lobby-card h1 {
+    font-size: 24px;
+  }
+}
