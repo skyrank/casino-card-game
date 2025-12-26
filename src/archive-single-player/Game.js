@@ -2,101 +2,20 @@ import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { createDeck, shuffleDeck, dealInitialCards, dealNextRound, calculateScore, canCapture } from './gameUtils';
 import './Game.css';
-import { database } from './firebase';
-import { ref, onValue, set, get } from 'firebase/database';
 
-function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
+function Game() {
   const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [message, setMessage] = useState('');
   const [selectedTableCards, setSelectedTableCards] = useState([]);
 
-  console.log('Game rendering. playerRole:', playerRole, 'selectedCard:', selectedCard);
+  console.log('Game rendering. selectedCard:', selectedCard);
 
-  // STEP 1: Listen to Firebase gameState
+  // Initialize game
   useEffect(() => {
-    if (!roomCode) return;
+    startNewGame();
+  }, []);
 
-    console.log('Setting up Firebase listener for room:', roomCode);
-    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-    
-    const unsubscribe = onValue(gameStateRef, (snapshot) => {
-      const data = snapshot.val();
-      console.log('Firebase gameState updated:', data);
-      
-      if (data) {
-        setGameState(data);
-        
-        // Update message based on turn
-        if (data.currentTurn === playerRole) {
-          setMessage(`Your turn! Select a card from your hand.`);
-        } else {
-          setMessage(`${opponentName}'s turn...`);
-        }
-      } else {
-        console.log('No gameState in Firebase yet');
-        setMessage('Waiting for game to start...');
-      }
-    });
-
-    return () => {
-      console.log('Cleaning up Firebase listener');
-      unsubscribe();
-    };
-  }, [roomCode, playerRole, opponentName]);
-
-  // STEP 2: Initialize game (Player 1 only)
-  useEffect(() => {
-    if (!roomCode || playerRole !== 'player1') return;
-
-    console.log('Player 1 checking if game needs initialization...');
-    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-    
-    // Check if gameState already exists
-    const checkAndInitialize = async () => {
-      const snapshot = await get(gameStateRef);
-      
-      if (!snapshot.exists()) {
-        console.log('No gameState found - Player 1 initializing game...');
-        await initializeGameInFirebase();
-      } else {
-        console.log('GameState already exists, skipping initialization');
-      }
-    };
-
-    checkAndInitialize();
-  }, [roomCode, playerRole]);
-
-  // STEP 2: Initialize game in Firebase (Player 1 only)
-  async function initializeGameInFirebase() {
-    console.log('Initializing game in Firebase...');
-    
-    const deck = shuffleDeck(createDeck());
-    const { player1Hand, player2Hand, tableCards, deck: remainingDeck } = dealInitialCards(deck);
-
-    const initialGameState = {
-      deck: remainingDeck,
-      player1Hand,
-      player2Hand,
-      tableCards,
-      player1Captured: [],
-      player2Captured: [],
-      currentTurn: 'player2',  // Player 2 goes first (non-dealer)
-      currentDealer: 'player1', // Player 1 is first dealer
-      roundNumber: 1,
-      player1Score: 0,
-      player2Score: 0,
-      lastCapture: null,
-      builds: []
-    };
-
-    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-    await set(gameStateRef, initialGameState);
-    
-    console.log('Game initialized in Firebase!', initialGameState);
-  }
-
-  // Keep existing game logic - we'll modify this in later steps
   function startNewGame() {
     const deck = shuffleDeck(createDeck());
 
@@ -111,6 +30,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       deck: remainingDeck.length,
       total: player1Hand.length + player2Hand.length + tableCards.length + remainingDeck.length
     });
+    console.log('Shuffled deck first 10 cards:', deck.slice(0, 10));
+
 
     setGameState({
       deck: remainingDeck,
@@ -120,8 +41,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player1Captured: [],
       player2Captured: [],
       currentTurn: 'player1',
-      currentDealer: 'player1',
-      roundNumber: 1,
       player1Score: 0,
       player2Score: 0,
       lastCapture: null,
@@ -204,7 +123,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
     return hasSubsetSum(cards, target);
   }
-  
   function captureCards(tableIndices) {
     console.log('captureCards called! Indices:', tableIndices, 'Selected:', selectedCard);
     const { card: playedCard, source, index: handIndex } = selectedCard;
@@ -229,18 +147,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player1Captured: currentPlayer === 'player1' ? newCaptured : gameState.player1Captured,
       player2Captured: currentPlayer === 'player2' ? newCaptured : gameState.player2Captured,
       currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
       player1Score: gameState.player1Score,
       player2Score: gameState.player2Score,
-      lastCapture: currentPlayer,
-      builds: gameState.builds
+      lastCapture: currentPlayer
     };
 
     setGameState(newState);
 
     setSelectedCard(null);
-    setSelectedTableCards([]);
     setMessage(`Player ${currentPlayer === 'player1' ? '1' : '2'} captured ${capturedTableCards.length + 1} card(s)!`);
 
     console.log('Checking for deal. P1 hand:', newState.player1Hand.length, 'P2 hand:', newState.player2Hand.length);
@@ -249,7 +163,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       checkForNextDeal(newState);
     }
   }
-  
   function handleTrail() {
     console.log('Trail clicked! Selected card:', selectedCard);
     setMessage('TESTING: ' + Math.random());
@@ -277,8 +190,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player1Captured: gameState.player1Captured,
       player2Captured: gameState.player2Captured,
       currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
       player1Score: gameState.player1Score,
       player2Score: gameState.player2Score,
       lastCapture: gameState.lastCapture,
@@ -287,7 +198,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
     setGameState(newState);
     setSelectedCard(null);
-    setSelectedTableCards([]);
 
     // Check AFTER newState is created
     console.log('Checking for deal. P1 hand:', newState.player1Hand.length, 'P2 hand:', newState.player2Hand.length);
@@ -296,7 +206,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       checkForNextDeal(newState);
     }
   }
-  
   function handleCapture() {
     if (!selectedCard) {
       setMessage('Select a hand card first!');
@@ -309,195 +218,49 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     // Find all valid table card combinations that can be captured
     const validCombos = findCapturableCombinations(gameState.tableCards, playedCard.rank);
 
-    // Check for build captures
-    const buildCaptures = [];
-    if (gameState.builds) {
-      gameState.builds.forEach((build, buildIndex) => {
-        if (build.value === playedCard.rank) {
-          buildCaptures.push({ type: 'build', buildIndex, description: `Build of ${build.value}` });
-        }
-      });
-    }
+    // Find all builds that can be captured
+    const capturableBuilds = gameState.builds.filter(build => build.value === playedCard.rank);
 
-    // If there are selected table cards, validate them
-    if (selectedTableCards.length > 0) {
-      const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
-      
-      // Check if selection matches a valid combination
-      const matchingCombo = validCombos.find(combo => {
-        const comboIndices = combo.indices.sort();
-        return JSON.stringify(comboIndices) === JSON.stringify(selectedIndices);
-      });
-
-      if (matchingCombo) {
-        captureCards(selectedIndices);
-      } else {
-        setMessage('Invalid capture combination! Try different cards.');
-      }
-    } else if (buildCaptures.length > 0) {
-      // Automatically capture first available build
-      captureBuild(buildCaptures[0].buildIndex);
-    } else if (validCombos.length > 0) {
-      setMessage(`Select cards to capture. Available: ${validCombos.map(c => c.description).join(', ')}`);
-    } else {
-      setMessage('No valid captures available. Trail instead?');
-    }
-  }
-
-  function findCapturableCombinations(tableCards, playedRank) {
-    const combinations = [];
-    
-    // 1. Pairing - exact rank match
-    tableCards.forEach((card, index) => {
-      if (card.rank === playedRank) {
-        combinations.push({
-          type: 'pair',
-          indices: [index],
-          cards: [card],
-          description: getCardName(card)
-        });
-      }
-    });
-
-    // 2. Combining - multiple cards that sum to playedRank
-    const n = tableCards.length;
-    for (let mask = 1; mask < (1 << n); mask++) {
-      const subset = [];
-      const indices = [];
-      
-      for (let i = 0; i < n; i++) {
-        if (mask & (1 << i)) {
-          subset.push(tableCards[i]);
-          indices.push(i);
-        }
-      }
-      
-      if (subset.length > 1) {
-        const sum = subset.reduce((acc, card) => acc + card.rank, 0);
-        if (sum === playedRank) {
-          combinations.push({
-            type: 'combine',
-            indices,
-            cards: subset,
-            description: subset.map(c => getCardName(c)).join(' + ')
-          });
-        }
-      }
-    }
-
-    return combinations;
-  }
-
-  function handleBuild() {
-    if (!selectedCard) {
-      setMessage('Select a hand card first!');
+    if (validCombos.length === 0 && capturableBuilds.length === 0) {
+      setMessage(`Cannot capture! No table cards or builds match ${playedCard.rank}`);
       return;
     }
 
-    if (selectedTableCards.length === 0) {
-      setMessage('Select table cards to build with!');
-      return;
-    }
+    // Flatten all valid combinations to get all capturable table card indices
+    const allCapturableIndices = [...new Set(validCombos.flat())];
 
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const selectedCards = selectedTableCards.map(tc => tc.card);
+    // Capture table cards
+    const capturedTableCards = allCapturableIndices.map(i => gameState.tableCards[i]);
 
-    // Calculate the total value
-    const totalValue = playedCard.rank + selectedCards.reduce((sum, c) => sum + c.rank, 0);
+    // Capture all cards from builds
+    const capturedBuildCards = capturableBuilds.flatMap(build => build.cards);
 
-    // Check if player can make groups that sum to totalValue
-    if (!canMakeGroups([playedCard, ...selectedCards], totalValue)) {
-      setMessage('Cannot form valid groups for this build!');
-      return;
-    }
-
-    // Create the build
-    const newBuild = {
-      value: totalValue,
-      cards: [playedCard, ...selectedCards],
-      owner: gameState.currentTurn
-    };
-
-    // Remove card from hand
-    const currentPlayer = gameState.currentTurn;
+    // Remove from hand
     const newHand = [...gameState[`${currentPlayer}Hand`]];
     newHand.splice(handIndex, 1);
 
-    // Remove selected cards from table
-    const selectedIndices = selectedTableCards.map(tc => tc.index);
-    const newTableCards = gameState.tableCards.filter((_, i) => !selectedIndices.includes(i));
+    // Remove captured table cards
+    const newTableCards = gameState.tableCards.filter((_, i) => !allCapturableIndices.includes(i));
 
-    // Add build to builds array
-    const newBuilds = [...(gameState.builds || []), newBuild];
+    // Remove captured builds
+    const newBuilds = gameState.builds.filter(build => build.value !== playedCard.rank);
+
+    // Add everything to captured pile
+    const newCaptured = [
+      ...gameState[`${currentPlayer}Captured`],
+      playedCard,
+      ...capturedTableCards,
+      ...capturedBuildCards
+    ];
 
     const newState = {
       deck: gameState.deck,
       player1Hand: currentPlayer === 'player1' ? newHand : gameState.player1Hand,
       player2Hand: currentPlayer === 'player2' ? newHand : gameState.player2Hand,
       tableCards: newTableCards,
-      player1Captured: gameState.player1Captured,
-      player2Captured: gameState.player2Captured,
-      currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
-      player1Score: gameState.player1Score,
-      player2Score: gameState.player2Score,
-      lastCapture: gameState.lastCapture,
-      builds: newBuilds
-    };
-
-    setGameState(newState);
-    setSelectedCard(null);
-    setSelectedTableCards([]);
-    setMessage(`Build of ${totalValue} created!`);
-
-    if (newHand.length === 0) {
-      const otherHand = currentPlayer === 'player1' ? newState.player2Hand : newState.player1Hand;
-      if (otherHand.length === 0) {
-        checkForNextDeal(newState);
-      }
-    }
-  }
-
-  function handleBuildClick(build, buildIndex) {
-    if (!selectedCard) {
-      setMessage('Select a hand card first!');
-      return;
-    }
-
-    // Check if the selected card can capture this build
-    if (selectedCard.card.rank === build.value) {
-      captureBuild(buildIndex);
-    } else {
-      setMessage(`You need a ${build.value} to capture this build!`);
-    }
-  }
-
-  function captureBuild(buildIndex) {
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const build = gameState.builds[buildIndex];
-    const currentPlayer = gameState.currentTurn;
-
-    // Remove card from hand
-    const newHand = [...gameState[`${currentPlayer}Hand`]];
-    newHand.splice(handIndex, 1);
-
-    // Remove the build
-    const newBuilds = gameState.builds.filter((_, i) => i !== buildIndex);
-
-    // Add all cards to captured pile
-    const newCaptured = [...gameState[`${currentPlayer}Captured`], playedCard, ...build.cards];
-
-    const newState = {
-      deck: gameState.deck,
-      player1Hand: currentPlayer === 'player1' ? newHand : gameState.player1Hand,
-      player2Hand: currentPlayer === 'player2' ? newHand : gameState.player2Hand,
-      tableCards: gameState.tableCards,
       player1Captured: currentPlayer === 'player1' ? newCaptured : gameState.player1Captured,
       player2Captured: currentPlayer === 'player2' ? newCaptured : gameState.player2Captured,
       currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
       player1Score: gameState.player1Score,
       player2Score: gameState.player2Score,
       lastCapture: currentPlayer,
@@ -507,20 +270,288 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     setGameState(newState);
     setSelectedCard(null);
     setSelectedTableCards([]);
-    setMessage(`Captured build of ${build.value}!`);
 
-    if (newHand.length === 0) {
-      const otherHand = currentPlayer === 'player1' ? newState.player2Hand : newState.player1Hand;
-      if (otherHand.length === 0) {
-        checkForNextDeal(newState);
+    const totalCaptured = capturedTableCards.length + capturedBuildCards.length + 1;
+    setMessage(`Player ${currentPlayer === 'player1' ? '1' : '2'} captured ${totalCaptured} card(s)!`);
+
+    // Check if both hands empty
+    if (newState.player1Hand.length === 0 && newState.player2Hand.length === 0) {
+      checkForNextDeal(newState);
+    }
+  }
+
+  function findCapturableCombinations(tableCards, targetValue) {
+    const results = [];
+
+    // Check each card individually (pairing)
+    tableCards.forEach((card, index) => {
+      if (card.rank === targetValue) {
+        results.push([index]);
+      }
+    });
+
+    // Check all combinations of 2+ cards
+    function findCombos(start, currentCombo, currentSum) {
+      if (currentSum === targetValue && currentCombo.length > 0) {
+        results.push([...currentCombo]);
+      }
+
+      if (currentSum >= targetValue) return;
+
+      for (let i = start; i < tableCards.length; i++) {
+        currentCombo.push(i);
+        findCombos(i + 1, currentCombo, currentSum + tableCards[i].rank);
+        currentCombo.pop();
       }
     }
+
+    findCombos(0, [], 0);
+
+    return results;
+  }
+
+  function findBuildOptions(playedCard, tableCards, playerHand, playedCardIndex) {
+    const allCards = [playedCard, ...tableCards];
+    const options = [];
+
+    // Check each possible target value that player has in hand
+    for (let targetValue = 1; targetValue <= 10; targetValue++) {  // Only 1-10, not 11-13
+      // Must have this card in hand (excluding the played card)
+      const hasCapturingCard = playerHand.some((card, idx) =>
+        card.rank === targetValue && idx !== playedCardIndex
+      );
+
+      if (!hasCapturingCard) continue;
+
+      // Check if cards can form valid groups for this target
+      const canBuild = canMakeGroups(allCards, targetValue);
+
+      if (canBuild) {
+        options.push(targetValue);
+      }
+    }
+
+    return options;
+  }
+
+  function canMakeGroups(cards, target) {
+    // Check if ALL cards can be partitioned into groups that each equal target
+
+    // Option 1: All cards sum to target (numerical build)
+    const totalSum = cards.reduce((sum, c) => sum + c.rank, 0);
+    if (totalSum === target) return true;
+
+    // Option 2: Set build - partition ALL cards into groups that each equal target
+    function canPartitionAll(remaining, groups) {
+      if (remaining.length === 0) {
+        // Successfully used all cards, need at least 2 groups for set build
+        return groups.length >= 2 && groups.every(g => g.sum === target);
+      }
+
+      // Try to form a group that sums to target from remaining cards
+      for (let mask = 1; mask < (1 << remaining.length); mask++) {
+        let sum = 0;
+        let groupCards = [];
+
+        for (let i = 0; i < remaining.length; i++) {
+          if (mask & (1 << i)) {
+            sum += remaining[i].rank;
+            groupCards.push(remaining[i]);
+          }
+        }
+
+        if (sum === target) {
+          // Found a valid group, try to partition the rest
+          const newRemaining = remaining.filter((_, i) => !(mask & (1 << i)));
+          if (canPartitionAll(newRemaining, [...groups, { sum, cards: groupCards }])) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    return canPartitionAll(cards, []);
+  }
+
+
+
+  function handleBuild() {
+    if (!selectedCard || selectedTableCards.length === 0) {
+      setMessage('Select a hand card and table card(s) to build!');
+      return;
+    }
+
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const currentPlayer = gameState.currentTurn;
+
+    // Check if we're adding to an existing build
+    const selectedBuilds = selectedTableCards.filter(tc => tc.type === 'build');
+    const selectedRegularCards = selectedTableCards.filter(tc => tc.type !== 'build');
+
+    if (selectedBuilds.length > 0) {
+      // ADDING TO EXISTING BUILD
+      const existingBuild = selectedBuilds[0]; // Should only be one
+      const buildValue = existingBuild.build.value;
+
+      // Validate player has the capturing card
+      const hasCapturingCard = gameState[`${currentPlayer}Hand`].some(
+        (card, idx) => card.rank === buildValue && idx !== handIndex
+      );
+
+      if (!hasCapturingCard) {
+        setMessage(`Cannot add to build ${buildValue} - you don't have a ${buildValue} in your hand!`);
+        return;
+      }
+
+      // Add played card + selected table cards to the build
+      const newBuildCards = [
+        ...existingBuild.build.cards,
+        playedCard,
+        ...selectedRegularCards.map(tc => tc.card)
+      ];
+
+      const updatedBuild = {
+        ...existingBuild.build,
+        cards: newBuildCards
+      };
+
+      // Remove played card from hand
+      const newHand = [...gameState[`${currentPlayer}Hand`]];
+      newHand.splice(handIndex, 1);
+
+      // Remove selected regular table cards
+      const tableIndices = selectedRegularCards.map(tc => tc.index);
+      const newTableCards = gameState.tableCards.filter((_, i) => !tableIndices.includes(i));
+
+      // Replace the build
+      const newBuilds = gameState.builds.map((b, idx) =>
+        idx === existingBuild.buildIndex ? updatedBuild : b
+      );
+
+      const newState = {
+        deck: gameState.deck,
+        player1Hand: currentPlayer === 'player1' ? newHand : gameState.player1Hand,
+        player2Hand: currentPlayer === 'player2' ? newHand : gameState.player2Hand,
+        tableCards: newTableCards,
+        player1Captured: gameState.player1Captured,
+        player2Captured: gameState.player2Captured,
+        currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
+        player1Score: gameState.player1Score,
+        player2Score: gameState.player2Score,
+        lastCapture: gameState.lastCapture,
+        builds: newBuilds
+      };
+
+      setGameState(newState);
+      setSelectedCard(null);
+      setSelectedTableCards([]);
+      setMessage(`Player ${currentPlayer === 'player1' ? '1' : '2'} added to building ${buildValue}!`);
+
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 100);
+
+    } else {
+      // CREATING NEW BUILD (existing logic)
+      const tableCards = selectedTableCards.map(tc => tc.card);
+      const validBuildValues = findBuildOptions(
+        playedCard,
+        tableCards,
+        gameState[`${currentPlayer}Hand`],
+        handIndex
+      );
+
+      if (validBuildValues.length === 0) {
+        setMessage(`Cannot build - you don't have the capturing card in your hand!`);
+
+        setTimeout(() => {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }, 100);
+
+        return;
+      }
+
+
+
+      let buildValue;
+      if (validBuildValues.length === 1) {
+        buildValue = validBuildValues[0];
+      } else {
+        const choice = prompt(`Multiple build options available. What are you building?\nOptions: ${validBuildValues.join(', ')}`);
+        buildValue = parseInt(choice);
+        if (!validBuildValues.includes(buildValue)) {
+          setMessage('Invalid build choice!');
+          return;
+        }
+      }
+
+      const allCards = [playedCard, ...tableCards];
+      const totalSum = allCards.reduce((sum, card) => sum + card.rank, 0);
+      const buildType = (totalSum === buildValue) ? 'numerical' : 'set';
+
+      const buildCards = [playedCard, ...selectedTableCards.map(tc => tc.card)];
+      const newBuild = {
+        cards: buildCards,
+        value: buildValue,
+        owner: currentPlayer,
+        type: buildType
+      };
+
+      const newHand = [...gameState[`${currentPlayer}Hand`]];
+      newHand.splice(handIndex, 1);
+
+      const tableIndices = selectedTableCards.map(tc => tc.index);
+      const newTableCards = gameState.tableCards.filter((_, i) => !tableIndices.includes(i));
+
+      const newState = {
+        deck: gameState.deck,
+        player1Hand: currentPlayer === 'player1' ? newHand : gameState.player1Hand,
+        player2Hand: currentPlayer === 'player2' ? newHand : gameState.player2Hand,
+        tableCards: newTableCards,
+        player1Captured: gameState.player1Captured,
+        player2Captured: gameState.player2Captured,
+        currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
+        player1Score: gameState.player1Score,
+        player2Score: gameState.player2Score,
+        lastCapture: gameState.lastCapture,
+        builds: [...gameState.builds, newBuild]
+      };
+
+      setGameState(newState);
+      setSelectedCard(null);
+      setSelectedTableCards([]);
+      setMessage(`Player ${currentPlayer === 'player1' ? '1' : '2'} is building ${buildValue}${buildType === 'set' ? 's' : ''}!`);
+    }
+  }
+
+  function handleBuildClick(build, buildIndex) {
+    console.log('Build clicked:', build, buildIndex);
+
+    if (!selectedCard) {
+      setMessage('Select a card from your hand first!');
+      return;
+    }
+
+    // Add this build to selected items
+    setSelectedTableCards([...selectedTableCards, {
+      type: 'build',
+      build: build,
+      buildIndex: buildIndex
+    }]);
+
+    setMessage('Build selected. Add more cards or click Build button.');
   }
 
   function checkForNextDeal(currentState) {
     setTimeout(() => {
-      if (!currentState) {
-        console.log('checkForNextDeal: no currentState');
+      // Check if both hands are actually empty
+      const bothHandsEmpty = currentState.player1Hand.length === 0 && currentState.player2Hand.length === 0;
+
+      if (!bothHandsEmpty) {
+        // At least one player still has cards - don't deal, just let them finish playing
+        console.log('Waiting for players to finish their hands');
         return;
       }
 
@@ -551,7 +582,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       }
     }, 1500);
   }
-  
   function endRound() {
     console.log('END ROUND - Card count check:', {
       p1Captured: gameState.player1Captured.length,
@@ -608,8 +638,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player1Captured: player1Final,
       player2Captured: player2Final,
       currentTurn: null,
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
       player1Score: p1Score,
       player2Score: p2Score,
       lastCapture: gameState.lastCapture,
@@ -624,31 +652,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     return `${ranks[card.rank]} of ${card.suit}s`;
   }
 
-  // Show loading while waiting for Firebase data
-  if (!gameState) {
-    return (
-      <div className="game">
-        <div className="game-header">
-          <h1>🎴 Casino Card Game</h1>
-          <div className="room-info">
-            Room: <strong>{roomCode}</strong>
-            <button className="leave-btn" onClick={onLeaveGame}>Leave Game</button>
-          </div>
-        </div>
-        <div className="loading">Waiting for game to start...</div>
-      </div>
-    );
-  }
+  if (!gameState) return <div>Loading...</div>;
 
   return (
     <div className="game">
-      <div className="game-header">
-        <h1>🎴 Casino Card Game</h1>
-        <div className="room-info">
-          Room: <strong>{roomCode}</strong>
-          <button className="leave-btn" onClick={onLeaveGame}>Leave Game</button>
-        </div>
-      </div>
+      <h1>Casino Card Game</h1>
 
       <div className="message">{message}</div>
 
@@ -696,8 +704,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
               </div>
             ))}
 
-            {/* Render Builds */}
-            {gameState.builds && gameState.builds.map((build, i) => (
+            {/* ADD THIS SECTION - Render Builds */}
+            {gameState.builds.map((build, i) => (
               <div
                 key={`build-${i}`}
                 className="build-pile"
