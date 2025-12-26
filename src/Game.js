@@ -625,7 +625,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   }
 
   // Show loading while waiting for Firebase data
-  if (!gameState || !gameState.player1Hand || !gameState.player2Hand || !gameState.tableCards) {
+  if (!gameState) {
     return (
       <div className="game">
         <div className="game-header">
@@ -639,6 +639,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       </div>
     );
   }
+
+  // Use fallbacks for arrays that might be undefined from Firebase
+  const player1Hand = gameState.player1Hand || [];
+  const player2Hand = gameState.player2Hand || [];
+  const tableCards = gameState.tableCards || [];
+  const player1Captured = gameState.player1Captured || [];
+  const player2Captured = gameState.player2Captured || [];
+  const builds = gameState.builds || [];
 
   return (
     <div className="game">
@@ -660,7 +668,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <div className="hand">
             {gameState.currentTurn === 'player2' ? (
               // Show actual cards when it's Player 2's turn
-              gameState.player2Hand.map((card, i) => (
+              player2Hand.map((card, i) => (
                 <div
                   key={i}
                   onClick={() => handleCardClick(card, 'player2Hand', i)}
@@ -671,13 +679,13 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
               ))
             ) : (
               // Show card backs when it's NOT Player 2's turn
-              gameState.player2Hand.map((card, i) => (
+              player2Hand.map((card, i) => (
                 <div key={i} className="card-back"></div>
               ))
             )}
           </div>
           <div className="captured-info">
-            Captured: {gameState.player2Captured.length} cards | Score: {gameState.player2Score}
+            Captured: {player2Captured.length} cards | Score: {gameState.player2Score}
           </div>
         </div>
 
@@ -685,8 +693,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         <div className="table-section">
           <h2>Table</h2>
           <div className="table">
-            {console.log('Rendering table cards:', gameState.tableCards.length, gameState.tableCards)}
-            {gameState.tableCards.map((card, i) => (
+            {console.log('Rendering table cards:', tableCards.length, tableCards)}
+            {tableCards.map((card, i) => (
               <div
                 key={`${card.rank}-${card.suit}-${i}`}
                 onClick={() => handleTableCardClick(card, i)}
@@ -697,7 +705,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
             ))}
 
             {/* Render Builds */}
-            {gameState.builds && Array.isArray(gameState.builds) && gameState.builds.map((build, i) => (
+            {builds.map((build, i) => (
               <div
                 key={`build-${i}`}
                 className="build-pile"
@@ -723,7 +731,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <div className="hand">
             {gameState.currentTurn === 'player1' ? (
               // Show actual cards when it's Player 1's turn
-              gameState.player1Hand.map((card, i) => (
+              player1Hand.map((card, i) => (
                 <div
                   key={i}
                   onClick={() => handleCardClick(card, 'player1Hand', i)}
@@ -734,13 +742,13 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
               ))
             ) : (
               // Show card backs when it's NOT Player 1's turn
-              gameState.player1Hand.map((card, i) => (
+              player1Hand.map((card, i) => (
                 <div key={i} className="card-back"></div>
               ))
             )}
           </div>
           <div className="captured-info">
-            Captured: {gameState.player1Captured.length} cards | Score: {gameState.player1Score}
+            Captured: {player1Captured.length} cards | Score: {gameState.player1Score}
           </div>
         </div>
 
