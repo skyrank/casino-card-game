@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/casino-card-game/static/css/main.37ace006.css",
-    "main.js": "/casino-card-game/static/js/main.dc740315.js",
+    "main.js": "/casino-card-game/static/js/main.cfb2c853.js",
     "static/js/453.12ab87d2.chunk.js": "/casino-card-game/static/js/453.12ab87d2.chunk.js",
     "index.html": "/casino-card-game/index.html",
     "main.37ace006.css.map": "/casino-card-game/static/css/main.37ace006.css.map",
-    "main.dc740315.js.map": "/casino-card-game/static/js/main.dc740315.js.map",
+    "main.cfb2c853.js.map": "/casino-card-game/static/js/main.cfb2c853.js.map",
     "453.12ab87d2.chunk.js.map": "/casino-card-game/static/js/453.12ab87d2.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.37ace006.css",
-    "static/js/main.dc740315.js"
+    "static/js/main.cfb2c853.js"
   ]
 }
