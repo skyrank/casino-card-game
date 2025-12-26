@@ -625,7 +625,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   }
 
   // Show loading while waiting for Firebase data
-  if (!gameState) {
+  if (!gameState || !gameState.player1Hand || !gameState.player2Hand || !gameState.tableCards) {
     return (
       <div className="game">
         <div className="game-header">
@@ -697,7 +697,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
             ))}
 
             {/* Render Builds */}
-            {gameState.builds && gameState.builds.map((build, i) => (
+            {gameState.builds && Array.isArray(gameState.builds) && gameState.builds.map((build, i) => (
               <div
                 key={`build-${i}`}
                 className="build-pile"
