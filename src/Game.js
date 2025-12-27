@@ -3,7 +3,7 @@ import Card from './Card';
 import { createDeck, shuffleDeck, dealInitialCards, dealNextRound, calculateScore, canCapture } from './gameUtils';
 import './Game.css';
 import { database } from './firebase';
-import { ref, onValue, set, get } from 'firebase/database';
+import { ref, onValue, set, get, update } from 'firebase/database';
 
 function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [gameState, setGameState] = useState(null);
@@ -250,12 +250,17 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     }
   }
   
-  function handleTrail() {
+  async function handleTrail() {
     console.log('Trail clicked! Selected card:', selectedCard);
-    setMessage('TESTING: ' + Math.random());
 
     if (!selectedCard) {
       setMessage('Select a card from your hand first!');
+      return;
+    }
+
+    // STEP 3A: Validate it's the player's turn
+    if (gameState.currentTurn !== playerRole) {
+      setMessage("It's not your turn!");
       return;
     }
 
@@ -263,37 +268,33 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     const currentPlayer = gameState.currentTurn;
 
     // Remove from hand, add to table
-    const newHand = [...gameState[`${currentPlayer}Hand`]];
+    const newHand = [...(gameState[`${currentPlayer}Hand`] || [])];
     newHand.splice(handIndex, 1);
 
-    const newTableCards = [...gameState.tableCards, playedCard];
+    const newTableCards = [...(gameState.tableCards || []), playedCard];
 
-    // Create completely new object to force re-render
-    const newState = {
-      deck: gameState.deck,
-      player1Hand: currentPlayer === 'player1' ? newHand : gameState.player1Hand,
-      player2Hand: currentPlayer === 'player2' ? newHand : gameState.player2Hand,
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    // STEP 3A: Write to Firebase instead of local state
+    const updates = {
+      [`${currentPlayer}Hand`]: newHand,
       tableCards: newTableCards,
-      player1Captured: gameState.player1Captured,
-      player2Captured: gameState.player2Captured,
-      currentTurn: gameState.currentTurn === 'player1' ? 'player2' : 'player1',
-      currentDealer: gameState.currentDealer,
-      roundNumber: gameState.roundNumber,
-      player1Score: gameState.player1Score,
-      player2Score: gameState.player2Score,
-      lastCapture: gameState.lastCapture,
-      builds: gameState.builds
+      currentTurn: nextTurn
     };
 
-    setGameState(newState);
-    setSelectedCard(null);
-    setSelectedTableCards([]);
-
-    // Check AFTER newState is created
-    console.log('Checking for deal. P1 hand:', newState.player1Hand.length, 'P2 hand:', newState.player2Hand.length);
-    if (newState.player1Hand.length === 0 && newState.player2Hand.length === 0) {
-      console.log('BOTH HANDS EMPTY - calling checkForNextDeal');
-      checkForNextDeal(newState);
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+      
+      // Clear selections - Firebase listener will update gameState
+      setSelectedCard(null);
+      setSelectedTableCards([]);
+      
+      console.log('Trail move synced to Firebase');
+    } catch (error) {
+      console.error('Error updating Firebase:', error);
+      setMessage('Error making move. Please try again.');
     }
   }
   
