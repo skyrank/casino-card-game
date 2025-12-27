@@ -666,8 +666,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         <div className="player-section">
           <h2>Player 2 {gameState.currentTurn === 'player2' && '← TURN'}</h2>
           <div className="hand">
-            {gameState.currentTurn === 'player2' ? (
-              // Show actual cards when it's Player 2's turn
+            {playerRole === 'player2' ? (
+              // Show actual cards if YOU are Player 2
               player2Hand.map((card, i) => (
                 <div
                   key={i}
@@ -678,7 +678,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
                 </div>
               ))
             ) : (
-              // Show card backs when it's NOT Player 2's turn
+              // Show card backs if you're NOT Player 2
               player2Hand.map((card, i) => (
                 <div key={i} className="card-back"></div>
               ))
@@ -729,8 +729,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         <div className="player-section">
           <h2>Player 1 {gameState.currentTurn === 'player1' && '← TURN'}</h2>
           <div className="hand">
-            {gameState.currentTurn === 'player1' ? (
-              // Show actual cards when it's Player 1's turn
+            {playerRole === 'player1' ? (
+              // Show actual cards if YOU are Player 1
               player1Hand.map((card, i) => (
                 <div
                   key={i}
@@ -741,7 +741,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
                 </div>
               ))
             ) : (
-              // Show card backs when it's NOT Player 1's turn
+              // Show card backs if you're NOT Player 1
               player1Hand.map((card, i) => (
                 <div key={i} className="card-back"></div>
               ))
