@@ -513,6 +513,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     console.log('=== BUILD DEBUG ===');
     console.log('selectedCard:', selectedCard);
     console.log('selectedTableCards:', selectedTableCards);
+    console.log('selectedBuild:', selectedBuild);
     console.log('playerRole:', playerRole);
     
     if (!selectedCard) {
@@ -525,8 +526,15 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
+    // CASE 1: Increasing an existing build
+    if (selectedBuild) {
+      await increaseBuild(selectedBuild.index);
+      return;
+    }
+
+    // CASE 2: Creating a new build from table cards
     if (selectedTableCards.length === 0) {
-      setMessage('Select table cards to build with!');
+      setMessage('Select table cards to build with, or click a build to increase it!');
       return;
     }
 
@@ -613,10 +621,112 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
       setSelectedCard(null);
       setSelectedTableCards([]);
+      setSelectedBuild(null);
       setMessage(`${validValuesUnder10[0].description} created!`);
     } catch (error) {
       console.error('Error creating build:', error);
       setMessage('Error creating build. Please try again.');
+    }
+  }
+
+  async function increaseBuild(buildIndex) {
+    console.log('=== INCREASE BUILD DEBUG ===');
+    console.log('buildIndex:', buildIndex);
+    console.log('selectedCard:', selectedCard);
+    
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const build = gameState.builds[buildIndex];
+    
+    if (!build) {
+      console.error('Build not found:', buildIndex);
+      setMessage('Error: Build not found');
+      return;
+    }
+
+    // All cards that will be in the increased build
+    const allBuildCards = [playedCard, ...build.cards];
+    
+    // CASINO RULE: Cannot add picture cards to builds
+    if (playedCard.rank > 10) {
+      setMessage('Cannot add picture cards (J, Q, K) to builds!');
+      return;
+    }
+    
+    // Get player's remaining hand (minus the played card)
+    const handKey = `${playerRole}Hand`;
+    const currentHand = gameState[handKey] || [];
+    const remainingHand = currentHand.filter((_, idx) => idx !== handIndex);
+    
+    // Find all valid values for the increased build
+    const validValues = findValidBuildValues(allBuildCards, remainingHand);
+    
+    console.log('Valid increased build values:', validValues);
+    
+    if (validValues.length === 0) {
+      setMessage('Cannot increase - you must have a matching card in hand to capture this build later!');
+      return;
+    }
+    
+    // CASINO RULE: Maximum build value is 10
+    const validValuesUnder10 = validValues.filter(v => v.value <= 10);
+    if (validValuesUnder10.length === 0) {
+      setMessage('Cannot build higher than 10!');
+      return;
+    }
+    
+    // CASINO RULE: Can only increase, not decrease
+    const increasedValues = validValuesUnder10.filter(v => v.value > build.value);
+    if (increasedValues.length === 0) {
+      setMessage(`Cannot change build of ${build.value} - can only increase its value!`);
+      return;
+    }
+    
+    // Use the first valid increased value
+    const newBuildValue = increasedValues[0].value;
+    
+    console.log('Increasing build from', build.value, 'to', newBuildValue);
+
+    // Update the build
+    const newBuild = {
+      value: newBuildValue,
+      cards: allBuildCards,
+      owner: playerRole  // New owner is the player who increased it
+    };
+
+    // Remove card from hand
+    if (!currentHand || !Array.isArray(currentHand)) {
+      console.error('Hand not array in increase build:', handKey, currentHand);
+      setMessage('Error: Invalid hand state');
+      return;
+    }
+    
+    const newHand = remainingHand;
+
+    // Update the builds array
+    const currentBuilds = gameState.builds || [];
+    const newBuilds = currentBuilds.map((b, i) => i === buildIndex ? newBuild : b);
+
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    const updates = {
+      [handKey]: newHand,
+      builds: newBuilds,
+      currentTurn: nextTurn
+    };
+
+    console.log('Sending increase build updates:', updates);
+
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+
+      setSelectedCard(null);
+      setSelectedBuild(null);
+      setMessage(`Build increased from ${build.value} to ${newBuildValue}!`);
+    } catch (error) {
+      console.error('Error increasing build:', error);
+      setMessage('Error increasing build. Please try again.');
     }
   }
 
@@ -777,18 +887,26 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // Check if hand card matches build value
+    // Check if hand card matches build value for capture
     if (selectedCard.card.rank === build.value) {
-      // Select this build (toggle selection)
+      // Toggle selection for capture
       if (selectedBuild?.index === buildIndex) {
-        setSelectedBuild(null);  // Deselect if clicking same build
+        setSelectedBuild(null);
         setMessage('Build deselected');
       } else {
         setSelectedBuild({ build, index: buildIndex });
-        setMessage(`Build of ${build.value} selected. Click Capture to take it.`);
+        setMessage(`Build of ${build.value} selected. Click Capture to take it, or Build to increase it.`);
       }
     } else {
-      setMessage(`You need a ${build.value} to capture this build!`);
+      // Card doesn't match - maybe they want to increase the build
+      // Toggle selection for increasing
+      if (selectedBuild?.index === buildIndex) {
+        setSelectedBuild(null);
+        setMessage('Build deselected');
+      } else {
+        setSelectedBuild({ build, index: buildIndex });
+        setMessage(`Build selected. Click Build to add your ${selectedCard.card.rank} to this build.`);
+      }
     }
   }
 
@@ -969,7 +1087,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <button onClick={handleCapture} disabled={!selectedCard || !isMyTurn}>
             Capture
           </button>
-          <button onClick={handleBuild} disabled={!selectedCard || selectedTableCards.length === 0 || !isMyTurn}>
+          <button onClick={handleBuild} disabled={!selectedCard || (selectedTableCards.length === 0 && !selectedBuild) || !isMyTurn}>
             Build
           </button>
           <button onClick={handleTrail} disabled={!selectedCard || !isMyTurn}>
