@@ -392,7 +392,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     
     const newHand = currentHand.filter((_, idx) => idx !== handIndex);
     
-    const currentTableCards = gameState.tableCards || []; // Handle undefined as empty array
+    const currentTableCards = gameState.tableCards;
+    
+    if (!currentTableCards || !Array.isArray(currentTableCards)) {
+      console.error('Table cards not array in trail:', currentTableCards);
+      setMessage('Error: Invalid table state');
+      return;
+    }
+
     const newTableCards = [...currentTableCards, playedCard];
 
     console.log('newHand:', newHand);
