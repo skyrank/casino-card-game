@@ -1,15 +1,16 @@
 # Casino Card Game - Edge Cases & Implementation Tracking
 
 ## Current Status
-**Last Working Version:** Increase builds working (pre-multiple captures attempt)
-**Date:** December 30, 2025
+**Last Working Version:** Features 1,3,4,9,10 working (saved as Game-2025-12-31-features-1-3-4-9-10-working.js)
+**Date:** December 31, 2025
+**Git Commit:** Pushed to main branch
 
 ---
 
 ## CAPTURES - Multiple Cards (No Builds)
 
 ### ✅ IMPLEMENTED
-- [ ] None yet
+- [x] Capture multiple same-rank cards (#1) - Working as of 2025-12-31
 
 ### 🔧 TO IMPLEMENT
 
@@ -35,6 +36,8 @@
 **Example:** Player has 9♠. Table has: 9♥, 2♠+7♦, 5♣+4♥ → Can capture ALL (9, 2+7, 5+4)  
 **Note:** No standalone 9 required - any combination of 9s counts  
 **Note:** Can include 3+ card combinations (e.g., 2+3+4 = 9)
+
+**STATUS:** ❌ NOT WORKING - Cannot capture multiple combinations simultaneously (e.g., 10 cannot capture both 8+2 AND 8+A+A)
 
 **Functions Affected:**
 - `handleCapture()` - validate all valid 9-combinations
@@ -63,6 +66,8 @@
 **Description:** Player 1 creates build, then captures it on their next turn  
 **Example:** P1 has 3♠, 7♦. Plays 3♠ to 4♥ → Building 7s. Next turn: plays 7♦ to capture.
 
+**STATUS:** ✅ WORKING - Tested 2025-12-31
+
 **Functions Affected:**
 - Build ownership tracking
 - Turn validation
@@ -79,6 +84,8 @@
 #### 4. Opponent Captures Player's Build
 **Description:** Player 1 creates build, Player 2 captures it  
 **Example:** P1: 3♠ to 4♥ → Building 7s. P2 has 7♣ → captures build
+
+**STATUS:** ✅ WORKING - Tested 2025-12-31
 
 **Functions Affected:**
 - Build ownership (should NOT block opponent from capturing)
@@ -171,6 +178,8 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Example 2:** Build of 7s: [3+4, 5+2] → LOCKED (two groups of 7)  
 **Cannot add card to change value - only capturable with 7**
 
+**STATUS:** ✅ PARTIAL - Multiple-group builds CREATE correctly (A+6+2, 9 works). Lock enforcement NOT YET IMPLEMENTED.
+
 **Functions Affected:**
 - `increaseBuild()` - check if build is locked
 - `canPartitionIntoGroups()` - determine if multiple groups exist
@@ -186,6 +195,8 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 #### 10. Picture Cards Cannot Form Builds
 **Description:** J, Q, K have no rank and cannot participate in builds  
 **Example:** Cannot play K to anything to make a build
+
+**STATUS:** ✅ WORKING - Already implemented (rank > 10 check)
 
 **Functions Affected:**
 - `handleBuild()` - reject if selected cards include J/Q/K
@@ -253,6 +264,7 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 ---
 
 ## NOTES
-- **Current baseline:** Build increase working, multiple builds detection working
-- **Known issue:** "Building 20s" instead of "Building 10s" when playing 10 to two 10s (additive bug)
+- **Current baseline:** Features 1,3,4,9,10 working - saved as Game-2025-12-31-features-1-3-4-9-10-working.js
+- **Fixed:** Trail to empty table (handle undefined tableCards as [])
+- **Known issue:** "Building 20s" instead of "Building 10s" when playing 10 to two 10s (additive bug) - deferred
 - **Git repository:** `/Applications/joecode/casino-card-game`
