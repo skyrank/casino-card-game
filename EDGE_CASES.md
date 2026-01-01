@@ -1,16 +1,16 @@
 # Casino Card Game - Edge Cases & Implementation Tracking
 
 ## Current Status
-**Last Working Version:** Features 1,3,4,9,10 working (saved as Game-2025-12-31-features-1-3-4-9-10-working.js)
+**Last Working Version:** Features 1,3,4,9,10,11 working (Game-2025-12-31-features-1-3-4-9-10-11-working.js)
 **Date:** December 31, 2025
-**Git Commit:** Pushed to main branch
+**Git Commit:** Ready to push
 
 ---
 
 ## CAPTURES - Multiple Cards (No Builds)
 
 ### ✅ IMPLEMENTED
-- [x] Capture multiple same-rank cards (#1) - Working as of 2025-12-31
+- [ ] None yet
 
 ### 🔧 TO IMPLEMENT
 
@@ -36,8 +36,6 @@
 **Example:** Player has 9♠. Table has: 9♥, 2♠+7♦, 5♣+4♥ → Can capture ALL (9, 2+7, 5+4)  
 **Note:** No standalone 9 required - any combination of 9s counts  
 **Note:** Can include 3+ card combinations (e.g., 2+3+4 = 9)
-
-**STATUS:** ❌ NOT WORKING - Cannot capture multiple combinations simultaneously (e.g., 10 cannot capture both 8+2 AND 8+A+A)
 
 **Functions Affected:**
 - `handleCapture()` - validate all valid 9-combinations
@@ -66,8 +64,6 @@
 **Description:** Player 1 creates build, then captures it on their next turn  
 **Example:** P1 has 3♠, 7♦. Plays 3♠ to 4♥ → Building 7s. Next turn: plays 7♦ to capture.
 
-**STATUS:** ✅ WORKING - Tested 2025-12-31
-
 **Functions Affected:**
 - Build ownership tracking
 - Turn validation
@@ -84,8 +80,6 @@
 #### 4. Opponent Captures Player's Build
 **Description:** Player 1 creates build, Player 2 captures it  
 **Example:** P1: 3♠ to 4♥ → Building 7s. P2 has 7♣ → captures build
-
-**STATUS:** ✅ WORKING - Tested 2025-12-31
 
 **Functions Affected:**
 - Build ownership (should NOT block opponent from capturing)
@@ -178,8 +172,6 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Example 2:** Build of 7s: [3+4, 5+2] → LOCKED (two groups of 7)  
 **Cannot add card to change value - only capturable with 7**
 
-**STATUS:** ✅ PARTIAL - Multiple-group builds CREATE correctly (A+6+2, 9 works). Lock enforcement NOT YET IMPLEMENTED.
-
 **Functions Affected:**
 - `increaseBuild()` - check if build is locked
 - `canPartitionIntoGroups()` - determine if multiple groups exist
@@ -188,15 +180,32 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Potential Breaks:**
 - Single-group build increase
 
-**STATUS:** Detection logic exists, need lock enforcement
+**STATUS:** ✅ PARTIAL - Multiple-group builds CREATE correctly (A+6+2, 9 works). Lock enforcement NOT YET IMPLEMENTED.
+
+---
+
+#### 9a. Add Hand Card to Existing Build (Create Multiple-Group)
+**Description:** Player adds same-value card from hand to existing build, creating multiple-group build  
+**Example:** Build of 8s exists (3+5). Player has 8♠, 8♥. Plays 8♠ to build → (3+5, 8) = Building 8s (multiple-group, now locked)  
+**Different from #7:** This is TWO moves (add now, capture later). Feature #7 is ONE move (add + capture immediately).
+
+**Functions Affected:**
+- `handleBuild()` - detect "add to existing build" scenario
+- Build selection logic
+- Multiple-group build creation
+
+**Potential Breaks:**
+- Increase build functionality
+- Build validation
+- Build button behavior
+
+**STATUS:** ❌ NOT WORKING - Build button lights up but doesn't perform action (discovered 2025-12-31)
 
 ---
 
 #### 10. Picture Cards Cannot Form Builds
 **Description:** J, Q, K have no rank and cannot participate in builds  
 **Example:** Cannot play K to anything to make a build
-
-**STATUS:** ✅ WORKING - Already implemented (rank > 10 check)
 
 **Functions Affected:**
 - `handleBuild()` - reject if selected cards include J/Q/K
@@ -212,6 +221,8 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Description:** If player has an active build they created, they CANNOT trail  
 **Note:** They CAN capture other cards before capturing their build  
 **Note:** Only applies to builds they own, not opponent's builds
+
+**STATUS:** ✅ WORKING - Tested 2025-12-31 (3 successful tests)
 
 **Functions Affected:**
 - `handleTrail()` - check if player has active build
@@ -264,7 +275,9 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 ---
 
 ## NOTES
-- **Current baseline:** Features 1,3,4,9,10 working - saved as Game-2025-12-31-features-1-3-4-9-10-working.js
+- **Current baseline:** Features 1,3,4,9,10,11 working - saved as Game-2025-12-31-features-1-3-4-9-10-11-working.js
 - **Fixed:** Trail to empty table (handle undefined tableCards as [])
+- **Fixed:** Active build trail restriction (Feature #11)
+- **Discovered:** Feature #9a bug - cannot add hand card to existing build
 - **Known issue:** "Building 20s" instead of "Building 10s" when playing 10 to two 10s (additive bug) - deferred
 - **Git repository:** `/Applications/joecode/casino-card-game`
