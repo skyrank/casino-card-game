@@ -1,9 +1,10 @@
 # Casino Card Game - Edge Cases & Implementation Tracking
 
 ## Current Status
-**Last Working Version:** Features 1,3,4,9,10,11 working (Game-2025-12-31-features-1-3-4-9-10-11-working.js)
-**Date:** December 31, 2025
-**Git Commit:** Ready to push
+**Last Working Version:** Features 1,3,4,5,9,10,11 working (live on Vercel)
+**Date:** January 2, 2026
+**Deployment:** Live at casino-card-game.vercel.app
+**Testing:** 4 successful multiplayer games completed 2026-01-02
 
 ---
 
@@ -97,6 +98,8 @@
 **Description:** Player 1 creates build, Player 2 increases it  
 **Example:** P1: 3+4 = Building 7s. P2 has 2♥, 9♠ → adds 2♥ → Building 9s. P2 captures next turn.
 
+**STATUS:** ✅ WORKING - Confirmed in multiplayer testing 2026-01-02 (P1: 2+4=Building 6s, P2 added 2→Building 8s, captured with 8)
+
 **Functions Affected:**
 - `increaseBuild()` - allow any player to increase any build
 - Build ownership transfer (new owner is increaser)
@@ -105,8 +108,6 @@
 **Potential Breaks:**
 - Own build increase
 - Capture validation
-
-**STATUS:** Need to test opponent can increase
 
 ---
 
@@ -180,26 +181,7 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Potential Breaks:**
 - Single-group build increase
 
-**STATUS:** ✅ PARTIAL - Multiple-group builds CREATE correctly (A+6+2, 9 works). Lock enforcement NOT YET IMPLEMENTED.
-
----
-
-#### 9a. Add Hand Card to Existing Build (Create Multiple-Group)
-**Description:** Player adds same-value card from hand to existing build, creating multiple-group build  
-**Example:** Build of 8s exists (3+5). Player has 8♠, 8♥. Plays 8♠ to build → (3+5, 8) = Building 8s (multiple-group, now locked)  
-**Different from #7:** This is TWO moves (add now, capture later). Feature #7 is ONE move (add + capture immediately).
-
-**Functions Affected:**
-- `handleBuild()` - detect "add to existing build" scenario
-- Build selection logic
-- Multiple-group build creation
-
-**Potential Breaks:**
-- Increase build functionality
-- Build validation
-- Build button behavior
-
-**STATUS:** ❌ NOT WORKING - Build button lights up but doesn't perform action (discovered 2025-12-31)
+**STATUS:** Detection logic exists, need lock enforcement
 
 ---
 
@@ -221,8 +203,6 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Description:** If player has an active build they created, they CANNOT trail  
 **Note:** They CAN capture other cards before capturing their build  
 **Note:** Only applies to builds they own, not opponent's builds
-
-**STATUS:** ✅ WORKING - Tested 2025-12-31 (3 successful tests)
 
 **Functions Affected:**
 - `handleTrail()` - check if player has active build
@@ -275,9 +255,11 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 ---
 
 ## NOTES
-- **Current baseline:** Features 1,3,4,9,10,11 working - saved as Game-2025-12-31-features-1-3-4-9-10-11-working.js
+- **Current baseline:** Features 1,3,4,5,9,10,11 working - deployed live on Vercel
+- **Deployment:** https://casino-card-game.vercel.app
 - **Fixed:** Trail to empty table (handle undefined tableCards as [])
 - **Fixed:** Active build trail restriction (Feature #11)
-- **Discovered:** Feature #9a bug - cannot add hand card to existing build
+- **Confirmed:** Feature #5 (opponent increases build) working in live multiplayer testing
+- **Discovered:** Feature #9a bug - cannot add hand card to existing build (Build button highlights but doesn't work)
 - **Known issue:** "Building 20s" instead of "Building 10s" when playing 10 to two 10s (additive bug) - deferred
 - **Git repository:** `/Applications/joecode/casino-card-game`
