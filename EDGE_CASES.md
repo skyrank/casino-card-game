@@ -181,7 +181,26 @@ Plays 2♠ to 3♥ and 5♠ → Could be Building 5s (2+3=5, 5) OR Building 10s 
 **Potential Breaks:**
 - Single-group build increase
 
-**STATUS:** Detection logic exists, need lock enforcement
+**STATUS:** ✅ PARTIAL - Multiple-group builds CREATE correctly (A+6+2, 9 works). Lock enforcement NOT YET IMPLEMENTED.
+
+---
+
+#### 9a. Add Hand Card to Existing Build (Create Multiple-Group)
+**Description:** Player adds same-value card from hand to existing build, creating multiple-group build  
+**Example:** Build of 8s exists (3+5). Player has 8♠, 8♥. Plays 8♠ to build → (3+5, 8) = Building 8s (multiple-group, now locked)  
+**Different from #7:** This is TWO moves (add now, capture later). Feature #7 is ONE move (add + capture immediately).
+
+**Functions Affected:**
+- `handleBuild()` - detect "add to existing build" scenario
+- Build selection logic
+- Multiple-group build creation
+
+**Potential Breaks:**
+- Increase build functionality
+- Build validation
+- Build button behavior
+
+**STATUS:** ❌ NOT WORKING - Build button highlights but doesn't perform action (confirmed in multiplayer testing 2026-01-02)
 
 ---
 

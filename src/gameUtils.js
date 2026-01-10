@@ -56,22 +56,41 @@ export function dealNextRound(deck, numCards = 4) {
 export function calculateScore(capturedCards) {
   let score = 0;
   let spadeCount = 0;
+  let aceCount = 0;
+  let has10Diamond = false;
+  let has2Spade = false;
   
   capturedCards.forEach(card => {
     // Count aces (1 point each)
-    if (card.rank === 1) score += 1;
+    if (card.rank === 1) {
+      score += 1;
+      aceCount += 1;
+    }
     
     // Little casino (2 of spades)
-    if (card.rank === 2 && card.suit === "Spade") score += 1;
+    if (card.rank === 2 && card.suit === "Spade") {
+      score += 1;
+      has2Spade = true;
+    }
     
     // Big casino (10 of diamonds)
-    if (card.rank === 10 && card.suit === "Diamond") score += 2;
+    if (card.rank === 10 && card.suit === "Diamond") {
+      score += 2;
+      has10Diamond = true;
+    }
     
     // Count spades for majority
     if (card.suit === "Spade") spadeCount++;
   });
   
-  return { score, spadeCount, cardCount: capturedCards.length };
+  return { 
+    score, 
+    spadeCount, 
+    cardCount: capturedCards.length,
+    aceCount,
+    has10Diamond,
+    has2Spade
+  };
 }
 
 export function canCapture(playedCard, tableCards) {
