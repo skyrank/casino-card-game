@@ -225,3 +225,33 @@
   transform: scale(0.7);
   transform-origin: center;
 }
+
+/* Sound Toggle Button Styles */
+/* Add these styles to your Game.css file */
+
+.sound-toggle {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 10px;
+  transition: background-color 0.3s;
+}
+
+.sound-toggle:hover {
+  background-color: #45a049;
+}
+
+.sound-toggle:active {
+  transform: scale(0.98);
+}
+
+/* Update room-info to handle multiple buttons */
+.room-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
