@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import Game from './Game';
 import GameLobby from './GameLobby';
@@ -13,6 +13,26 @@ function App() {
   const [playerRole, setPlayerRole] = useState(null); // 'player1' or 'player2'
   const [opponentName, setOpponentName] = useState('');
   const [error, setError] = useState(null);
+
+  // Handle leaving the game - wrapped in useCallback to prevent recreation
+  const handleLeaveGame = useCallback(async () => {
+    if (roomCode) {
+      try {
+        const gameRef = ref(database, `casino-games/${roomCode}`);
+        await remove(gameRef);
+      } catch (err) {
+        console.error('Error leaving game:', err);
+      }
+    }
+    
+    localStorage.removeItem('casinoGame');
+    setGamePhase('lobby');
+    setRoomCode(null);
+    setPlayerRole(null);
+    setPlayerName('');
+    setOpponentName('');
+    setError(null);
+  }, [roomCode]);
 
   // Listen to game state changes
   useEffect(() => {
@@ -47,7 +67,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [roomCode, playerRole]);
+  }, [roomCode, playerRole, handleLeaveGame]);
 
   // Handle creating a new game
   const handleCreateGame = async (code, name) => {
@@ -152,26 +172,6 @@ function App() {
       setError('Failed to join game. Please try again.');
       return false;
     }
-  };
-
-  // Handle leaving the game
-  const handleLeaveGame = async () => {
-    if (roomCode) {
-      try {
-        const gameRef = ref(database, `casino-games/${roomCode}`);
-        await remove(gameRef);
-      } catch (err) {
-        console.error('Error leaving game:', err);
-      }
-    }
-    
-    localStorage.removeItem('casinoGame');
-    setGamePhase('lobby');
-    setRoomCode(null);
-    setPlayerRole(null);
-    setPlayerName('');
-    setOpponentName('');
-    setError(null);
   };
 
   // Try to reconnect on page load
