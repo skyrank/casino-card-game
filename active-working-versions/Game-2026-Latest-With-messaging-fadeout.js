@@ -1130,14 +1130,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   // Format card name for play messages - shows suit for Aces, Spades, 10♦, 2♠
   function formatCardForMessage(card) {
     const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    const suits = { heart: '♥', diamond: '♦', club: '♣', spade: '♠' };
+    const suits = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
     
     const rank = ranks[card.rank];
     
     // Show suit for: All Aces, All Spades, 10 of Diamonds, 2 of Spades
-    if (card.rank === 1 || card.suit === 'spade' || 
-        (card.rank === 10 && card.suit === 'diamond') || 
-        (card.rank === 2 && card.suit === 'spade')) {
+    if (card.rank === 1 || card.suit === 'spades' || 
+        (card.rank === 10 && card.suit === 'diamonds') || 
+        (card.rank === 2 && card.suit === 'spades')) {
       return `${rank}${suits[card.suit]}`;
     }
     

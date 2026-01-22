@@ -14,7 +14,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [selectedBuild, setSelectedBuild] = useState(null);  // Store selected build for capture
   const [isDealing, setIsDealing] = useState(false);  // Prevent duplicate deals
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
-  const [playMessage, setPlayMessage] = useState(null);  // Animated message for plays
 
   // Initialize sound manager
   useEffect(() => {
@@ -417,14 +416,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       await update(gameStateRef, updates);
       
       soundManager.play('capture'); // Play capture sound
-      
-      // Generate play message
-      const currentPlayerName = playerRole === 'player1' ? playerName : opponentName;
-      const capturedCardsStr = capturedTableCards.map(c => formatCardForMessage(c)).join(', ');
-      const playedCardStr = formatCardForMessage(playedCard);
-      const msgText = `${currentPlayerName} captured ${capturedCardsStr} with a ${playedCardStr}`;
-      showPlayMessage(msgText);
-      
       setSelectedCard(null);
       setSelectedTableCards([]);
       setMessage(`You captured ${capturedTableCards.length + 1} card(s)!`);
@@ -500,13 +491,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     await update(gameStateRef, updates);
 
     soundManager.play('trail'); // Play trail sound
-    
-    // Generate play message
-    const currentPlayerName = playerRole === 'player1' ? playerName : opponentName;
-    const trailedCardStr = formatCardForMessage(playedCard);
-    const msgText = `${currentPlayerName} trailed a ${trailedCardStr}`;
-    showPlayMessage(msgText);
-    
     setSelectedCard(null);
     
     // Removed immediate check - useEffect will handle dealing when Firebase syncs
@@ -1107,13 +1091,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       await update(gameStateRef, updates);
 
       soundManager.play('capture'); // Play capture sound
-      
-      // Generate play message
-      const currentPlayerName = playerRole === 'player1' ? playerName : opponentName;
-      const playedCardStr = formatCardForMessage(playedCard);
-      const msgText = `${currentPlayerName} captured a build of ${build.value} with a ${playedCardStr}`;
-      showPlayMessage(msgText);
-      
       setSelectedCard(null);
       setMessage(`You captured the build of ${build.value}!`);
     } catch (error) {
@@ -1125,31 +1102,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   function getCardName(card) {
     const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     return `${ranks[card.rank]} of ${card.suit}s`;
-  }
-
-  // Format card name for play messages - shows suit for Aces, Spades, 10♦, 2♠
-  function formatCardForMessage(card) {
-    const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    const suits = { heart: '♥', diamond: '♦', club: '♣', spade: '♠' };
-    
-    const rank = ranks[card.rank];
-    
-    // Show suit for: All Aces, All Spades, 10 of Diamonds, 2 of Spades
-    if (card.rank === 1 || card.suit === 'spade' || 
-        (card.rank === 10 && card.suit === 'diamond') || 
-        (card.rank === 2 && card.suit === 'spade')) {
-      return `${rank}${suits[card.suit]}`;
-    }
-    
-    return rank;
-  }
-
-  // Show animated play message that fades after 2 seconds
-  function showPlayMessage(text) {
-    setPlayMessage(text);
-    setTimeout(() => {
-      setPlayMessage(null);
-    }, 2000);
   }
 
   function toggleSound() {
@@ -1465,13 +1417,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
                 </div>
               </div>
             ))}
-            
-            {/* Animated play message */}
-            {playMessage && (
-              <div className="play-message-overlay">
-                {playMessage}
-              </div>
-            )}
           </div>
         </div>
 
