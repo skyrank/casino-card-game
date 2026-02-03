@@ -178,18 +178,24 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // PRIORITY 1: Check if a build is selected
-    if (selectedBuild) {
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const tableCards = gameState.tableCards || [];
+    const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
+
+    // NEW: Check if both build AND table cards are selected for combined capture
+    if (selectedBuild && selectedIndices.length > 0) {
+      await captureBuildWithTableCards(selectedBuild.index, selectedIndices);
+      return;
+    }
+
+    // PRIORITY 1: Check if ONLY a build is selected
+    if (selectedBuild && selectedIndices.length === 0) {
       await captureBuild(selectedBuild.index);
       setSelectedBuild(null);
       return;
     }
 
-    // PRIORITY 2: Check for table card captures
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const tableCards = gameState.tableCards || [];
-    const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
-
+    // PRIORITY 2: Check for ONLY table card captures
     if (selectedIndices.length === 0) {
       // No cards selected - show available captures
       const validCombos = findCapturableCombinations(tableCards, playedCard.rank);
@@ -1146,6 +1152,120 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     } catch (error) {
       console.error('Error capturing build:', error);
       setMessage('Error capturing build. Please try again.');
+    }
+  }
+
+  async function captureBuildWithTableCards(buildIndex, tableIndices) {
+    console.log('=== CAPTURE BUILD WITH TABLE CARDS DEBUG ===');
+    console.log('buildIndex:', buildIndex);
+    console.log('tableIndices:', tableIndices);
+    console.log('selectedCard:', selectedCard);
+    
+    if (!selectedCard) {
+      console.error('No selected card for combined capture');
+      setMessage('Error: No card selected');
+      return;
+    }
+    
+    const builds = gameState.builds || [];
+    const build = builds[buildIndex];
+    
+    if (!build) {
+      console.error('Build not found:', buildIndex);
+      setMessage('Error: Build not found');
+      return;
+    }
+
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const tableCards = gameState.tableCards || [];
+    
+    // Get the selected table cards
+    const selectedTableCards = [];
+    for (const idx of tableIndices) {
+      if (tableCards[idx]) {
+        selectedTableCards.push(tableCards[idx]);
+      }
+    }
+    
+    // Calculate total: build cards + selected table cards
+    const buildSum = build.cards.reduce((sum, c) => sum + c.rank, 0);
+    const tableSum = selectedTableCards.reduce((sum, c) => sum + c.rank, 0);
+    const totalSum = buildSum + tableSum;
+    
+    console.log('Build sum:', buildSum, 'Table sum:', tableSum, 'Total:', totalSum, 'Hand card:', playedCard.rank);
+    
+    // Validate that the total equals the played card
+    if (totalSum !== playedCard.rank) {
+      setMessage(`Cannot capture! Build (${buildSum}) + table cards (${tableSum}) = ${totalSum}, but you played a ${playedCard.rank}`);
+      return;
+    }
+
+    // Valid capture - remove played card from hand
+    const handKey = `${playerRole}Hand`;
+    const currentHand = gameState[handKey];
+    
+    if (!currentHand || !Array.isArray(currentHand)) {
+      console.error('Hand not array:', handKey, currentHand);
+      setMessage('Error: Invalid hand state');
+      return;
+    }
+    
+    const newHand = currentHand.filter((_, idx) => idx !== handIndex);
+
+    // Remove build
+    const newBuilds = builds.filter((_, i) => i !== buildIndex);
+    
+    // Remove selected table cards
+    const newTableCards = tableCards.filter((_, idx) => !tableIndices.includes(idx));
+
+    // Add everything to captured pile
+    const capturedKey = `${playerRole}Captured`;
+    const currentCaptured = gameState[capturedKey] || [];
+    const buildCards = build.cards || [];
+    const newCaptured = [...currentCaptured, playedCard, ...buildCards, ...selectedTableCards];
+
+    console.log('Combined capture:', {
+      buildCards: buildCards.length,
+      tableCards: selectedTableCards.length,
+      total: newCaptured.length
+    });
+
+    // Generate play message
+    const activePlayerName = gameState.currentTurn === 'player1' ? 
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
+    const tableCardsStr = selectedTableCards.map(c => formatCardForMessage(c)).join(', ');
+    const playedCardStr = formatCardForMessage(playedCard);
+    const msgText = `${activePlayerName} captured ${tableCardsStr} + build of ${build.value} with a ${playedCardStr}`;
+
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    const updates = {
+      [handKey]: newHand,
+      builds: newBuilds,
+      tableCards: newTableCards,
+      [capturedKey]: newCaptured,
+      currentTurn: nextTurn,
+      lastCapture: playerRole,
+      lastPlayMessage: msgText,
+      lastPlayTimestamp: Date.now()
+    };
+
+    console.log('Sending combined capture updates:', updates);
+
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+
+      soundManager.play('capture');
+      setSelectedCard(null);
+      setSelectedTableCards([]);
+      setSelectedBuild(null);
+      setMessage(`You captured the build + table cards!`);
+    } catch (error) {
+      console.error('Error in combined capture:', error);
+      setMessage('Error capturing. Please try again.');
     }
   }
 
