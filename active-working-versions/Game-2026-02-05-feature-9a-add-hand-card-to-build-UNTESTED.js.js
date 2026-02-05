@@ -15,7 +15,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [isDealing, setIsDealing] = useState(false);  // Prevent duplicate deals
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
   const [playMessage, setPlayMessage] = useState(null);  // Animated message for plays
-  const [lastSeenTimestamp, setLastSeenTimestamp] = useState(null);
 
   // Initialize sound manager
   useEffect(() => {
@@ -24,25 +23,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
   // Listen for play messages from Firebase
   useEffect(() => {
-    if (!gameState || !gameState.lastPlayMessage || !gameState.lastPlayTimestamp) return;
+    if (!gameState || !gameState.lastPlayMessage) return;
     
-    console.log('Play message useEffect triggered:', {
-      timestamp: gameState.lastPlayTimestamp,
-      lastSeen: lastSeenTimestamp,
-      message: gameState.lastPlayMessage
-    });
-    
-    // Only show if this is a NEW message we haven't seen yet
-    if (lastSeenTimestamp === gameState.lastPlayTimestamp) {
-      console.log('Skipping - already seen this timestamp');
-      return;
-    }
-    
-    console.log('Showing new message');
-    // Show the message
+    // Show the message when it updates
     showPlayMessage(gameState.lastPlayMessage);
-    setLastSeenTimestamp(gameState.lastPlayTimestamp);
-  }, [gameState?.lastPlayTimestamp]); // Only depend on timestamp changes, not lastSeenTimestamp
+  }, [gameState?.lastPlayTimestamp]); // Trigger when timestamp changes
 
   // Listen to Firebase for game state changes
   useEffect(() => {
@@ -663,10 +648,21 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // CASE 1: Increasing an existing build
+    // CASE 1: Modifying an existing build
     if (selectedBuild) {
-      await increaseBuild(selectedBuild.index);
-      return;
+      const { card: playedCard, index: handIndex } = selectedCard;
+      const build = gameState.builds[selectedBuild.index];
+      
+      // Check if this is adding same-value card (Feature #9a) vs increasing
+      if (playedCard.rank === build.value) {
+        // This is adding a same-value card to create multiple-group build
+        await addHandCardToBuild(selectedBuild.index);
+        return;
+      } else {
+        // This is increasing the build to a new value
+        await increaseBuild(selectedBuild.index);
+        return;
+      }
     }
 
     // CASE 2: Creating a new build from table cards
@@ -788,6 +784,12 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
+    // CASINO RULE: Cannot increase a locked multiple-group build
+    if (build.locked) {
+      setMessage('Cannot increase this build - it has multiple groups and is locked!');
+      return;
+    }
+
     // All cards that will be in the increased build
     const allBuildCards = [playedCard, ...build.cards];
     
@@ -872,6 +874,94 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     } catch (error) {
       console.error('Error increasing build:', error);
       setMessage('Error increasing build. Please try again.');
+    }
+  }
+
+  async function addHandCardToBuild(buildIndex) {
+    console.log('=== ADD HAND CARD TO BUILD DEBUG (Feature #9a) ===');
+    console.log('buildIndex:', buildIndex);
+    console.log('selectedCard:', selectedCard);
+    
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const build = gameState.builds[buildIndex];
+    
+    if (!build) {
+      console.error('Build not found:', buildIndex);
+      setMessage('Error: Build not found');
+      return;
+    }
+
+    // Verify played card matches build value
+    if (playedCard.rank !== build.value) {
+      setMessage(`Cannot add ${playedCard.rank} to Building ${build.value}s!`);
+      return;
+    }
+
+    // This creates a multiple-group build which is LOCKED (can't be increased later)
+    const newBuildCards = [...build.cards, playedCard];
+    
+    console.log('Adding card to build:', {
+      oldCards: build.cards.length,
+      newCards: newBuildCards.length,
+      value: build.value
+    });
+
+    // Get player's remaining hand (minus the played card)
+    const handKey = `${playerRole}Hand`;
+    const currentHand = gameState[handKey] || [];
+    const remainingHand = currentHand.filter((_, idx) => idx !== handIndex);
+    
+    // Verify player still has a card to capture this build later
+    const hasCapture = remainingHand.some(c => c.rank === build.value);
+    if (!hasCapture) {
+      setMessage(`You must keep a ${build.value} in hand to capture this build later!`);
+      return;
+    }
+
+    // Create updated build (keeps same value, same owner)
+    const updatedBuild = {
+      value: build.value,
+      cards: newBuildCards,
+      owner: build.owner,  // Original owner stays (different from increase!)
+      locked: true  // Now it's a multiple-group build, can't be increased
+    };
+
+    // Remove card from hand
+    const newHand = remainingHand;
+
+    // Update the builds array
+    const currentBuilds = gameState.builds || [];
+    const newBuilds = currentBuilds.map((b, i) => i === buildIndex ? updatedBuild : b);
+
+    // Generate play message
+    const activePlayerName = gameState.currentTurn === 'player1' ? 
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
+    const msgText = `${activePlayerName} added to building ${build.value}s (now locked)`;
+    
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    const updates = {
+      [handKey]: newHand,
+      builds: newBuilds,
+      currentTurn: nextTurn,
+      lastPlayMessage: msgText,
+      lastPlayTimestamp: Date.now()
+    };
+
+    console.log('Sending add-to-build updates:', updates);
+
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+
+      setSelectedCard(null);
+      setSelectedBuild(null);
+      setMessage(`Added ${playedCard.rank} to build - now Building ${build.value}s (locked)!`);
+    } catch (error) {
+      console.error('Error adding card to build:', error);
+      setMessage('Error adding to build. Please try again.');
     }
   }
 
@@ -1313,12 +1403,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
   // Show animated play message that fades after 2 seconds
   function showPlayMessage(text) {
-    console.log('showPlayMessage called with:', text);
     setPlayMessage(text);
     setTimeout(() => {
-      console.log('Clearing message after 4 seconds');
       setPlayMessage(null);
-    }, 4000); // Display for 4 seconds
+    }, 2000);
   }
 
   function toggleSound() {
