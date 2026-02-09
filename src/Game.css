@@ -20,6 +20,20 @@
   font-size: 28px;
 }
 
+
+win-counter {
+  margin: 0 15px;
+  padding: 5px 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  font-size: 0.9em;
+}
+
+.win-counter strong {
+  color: #4CAF50;
+  font-size: 1.1em;
+}
+
 .room-info {
   display: flex;
   align-items: center;

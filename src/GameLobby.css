@@ -158,3 +158,22 @@
     font-size: 24px;
   }
 }
+
+
+.custom-code-input {
+  margin-bottom: 5px;
+}
+
+.helper-text-small {
+  font-size: 0.8em;
+  color: #888;
+  margin: 5px 0 15px 0;
+  font-style: italic;
+}
+
+.option-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+

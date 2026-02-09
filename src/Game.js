@@ -15,7 +15,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [isDealing, setIsDealing] = useState(false);  // Prevent duplicate deals
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
   const [playMessage, setPlayMessage] = useState(null);  // Animated message for plays
-  const [lastSeenTimestamp, setLastSeenTimestamp] = useState(null);
 
   // Initialize sound manager
   useEffect(() => {
@@ -24,25 +23,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
   // Listen for play messages from Firebase
   useEffect(() => {
-    if (!gameState || !gameState.lastPlayMessage || !gameState.lastPlayTimestamp) return;
+    if (!gameState || !gameState.lastPlayMessage) return;
     
-    console.log('Play message useEffect triggered:', {
-      timestamp: gameState.lastPlayTimestamp,
-      lastSeen: lastSeenTimestamp,
-      message: gameState.lastPlayMessage
-    });
-    
-    // Only show if this is a NEW message we haven't seen yet
-    if (lastSeenTimestamp === gameState.lastPlayTimestamp) {
-      console.log('Skipping - already seen this timestamp');
-      return;
-    }
-    
-    console.log('Showing new message');
-    // Show the message
+    // Show the message when it updates
     showPlayMessage(gameState.lastPlayMessage);
-    setLastSeenTimestamp(gameState.lastPlayTimestamp);
-  }, [gameState?.lastPlayTimestamp]); // Only depend on timestamp changes, not lastSeenTimestamp
+  }, [gameState?.lastPlayTimestamp]); // Trigger when timestamp changes
 
   // Listen to Firebase for game state changes
   useEffect(() => {
@@ -128,6 +113,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player2Score: 0,          // Round score
       player1TotalScore: 0,     // Cumulative game score
       player2TotalScore: 0,     // Cumulative game score
+      player1Wins: 0,           // Persistent game wins
+      player2Wins: 0,           // Persistent game wins
       lastCapture: null,
       builds: []
     };
@@ -193,24 +180,18 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const tableCards = gameState.tableCards || [];
-    const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
-
-    // NEW: Check if both build AND table cards are selected for combined capture
-    if (selectedBuild && selectedIndices.length > 0) {
-      await captureBuildWithTableCards(selectedBuild.index, selectedIndices);
-      return;
-    }
-
-    // PRIORITY 1: Check if ONLY a build is selected
-    if (selectedBuild && selectedIndices.length === 0) {
+    // PRIORITY 1: Check if a build is selected
+    if (selectedBuild) {
       await captureBuild(selectedBuild.index);
       setSelectedBuild(null);
       return;
     }
 
-    // PRIORITY 2: Check for ONLY table card captures
+    // PRIORITY 2: Check for table card captures
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const tableCards = gameState.tableCards || [];
+    const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
+
     if (selectedIndices.length === 0) {
       // No cards selected - show available captures
       const validCombos = findCapturableCombinations(tableCards, playedCard.rank);
@@ -1015,6 +996,12 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
     console.log('Game over check:', { gameOver, winner, p1TotalScore, p2TotalScore });
 
+    // Increment win counter if someone won
+    const currentP1Wins = gameState.player1Wins || 0;
+    const currentP2Wins = gameState.player2Wins || 0;
+    const newP1Wins = gameOver && winner === 'player1' ? currentP1Wins + 1 : currentP1Wins;
+    const newP2Wins = gameOver && winner === 'player2' ? currentP2Wins + 1 : currentP2Wins;
+
     const updates = {
       deck: [],
       player1Hand: [],
@@ -1027,6 +1014,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       player2Score: p2Score,
       player1TotalScore: p1TotalScore,
       player2TotalScore: p2TotalScore,
+      player1Wins: newP1Wins,
+      player2Wins: newP2Wins,
       builds: [],
       roundEnded: true,  // Prevent infinite loop
       showRoundSummary: !gameOver,  // Show summary if game NOT over
@@ -1170,120 +1159,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     }
   }
 
-  async function captureBuildWithTableCards(buildIndex, tableIndices) {
-    console.log('=== CAPTURE BUILD WITH TABLE CARDS DEBUG ===');
-    console.log('buildIndex:', buildIndex);
-    console.log('tableIndices:', tableIndices);
-    console.log('selectedCard:', selectedCard);
-    
-    if (!selectedCard) {
-      console.error('No selected card for combined capture');
-      setMessage('Error: No card selected');
-      return;
-    }
-    
-    const builds = gameState.builds || [];
-    const build = builds[buildIndex];
-    
-    if (!build) {
-      console.error('Build not found:', buildIndex);
-      setMessage('Error: Build not found');
-      return;
-    }
-
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const tableCards = gameState.tableCards || [];
-    
-    // Get the selected table cards
-    const selectedTableCards = [];
-    for (const idx of tableIndices) {
-      if (tableCards[idx]) {
-        selectedTableCards.push(tableCards[idx]);
-      }
-    }
-    
-    // Calculate total: build cards + selected table cards
-    const buildSum = build.cards.reduce((sum, c) => sum + c.rank, 0);
-    const tableSum = selectedTableCards.reduce((sum, c) => sum + c.rank, 0);
-    const totalSum = buildSum + tableSum;
-    
-    console.log('Build sum:', buildSum, 'Table sum:', tableSum, 'Total:', totalSum, 'Hand card:', playedCard.rank);
-    
-    // Validate that the total equals the played card
-    if (totalSum !== playedCard.rank) {
-      setMessage(`Cannot capture! Build (${buildSum}) + table cards (${tableSum}) = ${totalSum}, but you played a ${playedCard.rank}`);
-      return;
-    }
-
-    // Valid capture - remove played card from hand
-    const handKey = `${playerRole}Hand`;
-    const currentHand = gameState[handKey];
-    
-    if (!currentHand || !Array.isArray(currentHand)) {
-      console.error('Hand not array:', handKey, currentHand);
-      setMessage('Error: Invalid hand state');
-      return;
-    }
-    
-    const newHand = currentHand.filter((_, idx) => idx !== handIndex);
-
-    // Remove build
-    const newBuilds = builds.filter((_, i) => i !== buildIndex);
-    
-    // Remove selected table cards
-    const newTableCards = tableCards.filter((_, idx) => !tableIndices.includes(idx));
-
-    // Add everything to captured pile
-    const capturedKey = `${playerRole}Captured`;
-    const currentCaptured = gameState[capturedKey] || [];
-    const buildCards = build.cards || [];
-    const newCaptured = [...currentCaptured, playedCard, ...buildCards, ...selectedTableCards];
-
-    console.log('Combined capture:', {
-      buildCards: buildCards.length,
-      tableCards: selectedTableCards.length,
-      total: newCaptured.length
-    });
-
-    // Generate play message
-    const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (playerRole === 'player1' ? playerName : opponentName) :
-      (playerRole === 'player2' ? playerName : opponentName);
-    const tableCardsStr = selectedTableCards.map(c => formatCardForMessage(c)).join(', ');
-    const playedCardStr = formatCardForMessage(playedCard);
-    const msgText = `${activePlayerName} captured ${tableCardsStr} + build of ${build.value} with a ${playedCardStr}`;
-
-    // Switch turn
-    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
-
-    const updates = {
-      [handKey]: newHand,
-      builds: newBuilds,
-      tableCards: newTableCards,
-      [capturedKey]: newCaptured,
-      currentTurn: nextTurn,
-      lastCapture: playerRole,
-      lastPlayMessage: msgText,
-      lastPlayTimestamp: Date.now()
-    };
-
-    console.log('Sending combined capture updates:', updates);
-
-    try {
-      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-      await update(gameStateRef, updates);
-
-      soundManager.play('capture');
-      setSelectedCard(null);
-      setSelectedTableCards([]);
-      setSelectedBuild(null);
-      setMessage(`You captured the build + table cards!`);
-    } catch (error) {
-      console.error('Error in combined capture:', error);
-      setMessage('Error capturing. Please try again.');
-    }
-  }
-
   function getCardName(card) {
     const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     return `${ranks[card.rank]} of ${card.suit}s`;
@@ -1313,12 +1188,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
   // Show animated play message that fades after 2 seconds
   function showPlayMessage(text) {
-    console.log('showPlayMessage called with:', text);
     setPlayMessage(text);
     setTimeout(() => {
-      console.log('Clearing message after 4 seconds');
       setPlayMessage(null);
-    }, 4000); // Display for 4 seconds
+    }, 2000);
   }
 
   function toggleSound() {
@@ -1383,6 +1256,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <h1>🎴 Casino Card Game</h1>
           <div className="room-info">
             Room: <strong>{roomCode}</strong>
+            <span className="win-counter">
+              {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+              {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
+            </span>
             <button className="sound-toggle" onClick={toggleSound}>
               {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
             </button>
@@ -1486,10 +1363,16 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         roundNumber: (gameState.roundNumber || 1) + 1,
         player1Score: 0,
         player2Score: 0,
+        player1TotalScore: 0,  // Reset total score for new game
+        player2TotalScore: 0,  // Reset total score for new game
+        player1Wins: gameState.player1Wins || 0,  // Preserve wins
+        player2Wins: gameState.player2Wins || 0,  // Preserve wins
         lastCapture: null,
         builds: [],
         roundEnded: false,
-        showRoundSummary: false  // Hide summary, start new round
+        showRoundSummary: false,  // Hide summary, start new round
+        gameOver: false,  // Clear game over state
+        winner: null  // Clear winner
       };
 
       const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
@@ -1503,6 +1386,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <h1>🎴 Casino Card Game</h1>
           <div className="room-info">
             Room: <strong>{roomCode}</strong>
+            <span className="win-counter">
+              {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+              {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
+            </span>
             <button className="sound-toggle" onClick={toggleSound}>
               {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
             </button>
@@ -1580,6 +1467,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         <h1>🎴 Casino Card Game</h1>
         <div className="room-info">
           Room: <strong>{roomCode}</strong>
+          <span className="win-counter">
+            {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+            {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
+          </span>
           <button className="sound-toggle" onClick={toggleSound}>
             {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
           </button>
