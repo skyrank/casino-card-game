@@ -1363,8 +1363,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         roundNumber: (gameState.roundNumber || 1) + 1,
         player1Score: 0,
         player2Score: 0,
-        player1TotalScore: 0,  // Reset total score for new game
-        player2TotalScore: 0,  // Reset total score for new game
+        player1TotalScore: gameState.player1TotalScore || 0,  // PRESERVE cumulative score
+        player2TotalScore: gameState.player2TotalScore || 0,  // PRESERVE cumulative score
         player1Wins: gameState.player1Wins || 0,  // Preserve wins
         player2Wins: gameState.player2Wins || 0,  // Preserve wins
         lastCapture: null,
