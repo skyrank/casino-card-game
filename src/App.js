@@ -78,7 +78,7 @@ function App() {
       // Check if game already exists
       const snapshot = await get(gameRef);
       if (snapshot.exists()) {
-        setError('Room code already in use. Please try again.');
+        setError('Room name already exists. Use "Join Game" to enter, or choose a different room name.');
         return false;
       }
 
@@ -125,25 +125,71 @@ function App() {
       // Check if game exists
       const snapshot = await get(gameRef);
       if (!snapshot.exists()) {
-        setError('Game not found. Please check the room code.');
+        setError('Room not found. Check the room name or click "New Game" to create it.');
         return false;
       }
 
       const gameData = snapshot.val();
 
-      // Check if game is full
+      // Check if player name matches Player 1 - allow rejoin
+      if (gameData.players?.player1?.name === name) {
+        setRoomCode(code);
+        setPlayerName(name);
+        setPlayerRole('player1');
+        
+        // Get opponent name if exists
+        if (gameData.players?.player2) {
+          setOpponentName(gameData.players.player2.name);
+        }
+        
+        // Set phase based on game status
+        if (gameData.status === 'waiting') {
+          setGamePhase('waiting');
+        } else if (gameData.status === 'playing') {
+          setGamePhase('playing');
+        }
+
+        // Save to localStorage
+        localStorage.setItem('casinoGame', JSON.stringify({
+          roomCode: code,
+          playerName: name,
+          playerRole: 'player1'
+        }));
+
+        return true;
+      }
+
+      // Check if player name matches Player 2 - allow rejoin
+      if (gameData.players?.player2?.name === name) {
+        setRoomCode(code);
+        setPlayerName(name);
+        setPlayerRole('player2');
+        setOpponentName(gameData.players.player1.name);
+        setGamePhase('playing');
+
+        // Save to localStorage
+        localStorage.setItem('casinoGame', JSON.stringify({
+          roomCode: code,
+          playerName: name,
+          playerRole: 'player2'
+        }));
+
+        return true;
+      }
+
+      // Name doesn't match either player - check if game is full
       if (gameData.players?.player2) {
-        setError('This game is full!');
+        setError('Game in progress. Choose a different room.');
         return false;
       }
 
-      // Check if game already started
+      // Check if game already started (shouldn't happen if player2 doesn't exist, but safety check)
       if (gameData.status !== 'waiting') {
         setError('This game has already started.');
         return false;
       }
 
-      // Join the game
+      // Join as new Player 2
       await update(gameRef, {
         'players/player2': {
           name: name,
