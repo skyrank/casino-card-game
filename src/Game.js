@@ -800,15 +800,16 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
     
-    // CASINO RULE: Can only increase, not decrease
-    const increasedValues = validValuesUnder10.filter(v => v.value > build.value);
-    if (increasedValues.length === 0) {
-      setMessage(`Cannot change build of ${build.value} - can only increase its value!`);
+    // CASINO RULE: Can increase build OR add matching card (duplicate)
+    // Allow if: new value > current value OR new value == current value (duplicating)
+    const validNewValues = validValuesUnder10.filter(v => v.value >= build.value);
+    if (validNewValues.length === 0) {
+      setMessage(`Cannot modify build of ${build.value}!`);
       return;
     }
     
-    // Use the first valid increased value
-    const newBuildValue = increasedValues[0].value;
+    // Use the first valid value (could be same value or increased)
+    const newBuildValue = validNewValues[0].value;
     
     console.log('Increasing build from', build.value, 'to', newBuildValue);
 
@@ -849,7 +850,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
       setSelectedCard(null);
       setSelectedBuild(null);
-      setMessage(`Build increased from ${build.value} to ${newBuildValue}!`);
+      if (newBuildValue === build.value) {
+        setMessage(`Added to build of ${build.value}!`);
+      } else {
+        setMessage(`Build increased from ${build.value} to ${newBuildValue}!`);
+      }
     } catch (error) {
       console.error('Error increasing build:', error);
       setMessage('Error increasing build. Please try again.');
