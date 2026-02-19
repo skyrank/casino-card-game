@@ -11,7 +11,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [message, setMessage] = useState('');
   const [selectedTableCards, setSelectedTableCards] = useState([]);
-  const [selectedBuild, setSelectedBuild] = useState(null);  // Store selected build for capture
+  const [selectedBuilds, setSelectedBuilds] = useState([]);  // Array to support multiple build selection
   const [isDealing, setIsDealing] = useState(false);  // Prevent duplicate deals
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
   const [playMessage, setPlayMessage] = useState(null);  // Animated message for plays
@@ -138,7 +138,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     soundManager.play('cardSelect'); // Play card selection sound
     setSelectedCard({ card, source, index });
     setSelectedTableCards([]); // Clear table card selections when selecting new hand card
-    setSelectedBuild(null); // Clear build selection when selecting new hand card
+    setSelectedBuilds([]); // Clear build selections when selecting new hand card
     setMessage(`Selected ${getCardName(card)}. Click table cards to capture, or click "Trail" to play without capturing.`);
   }
 
@@ -154,7 +154,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     }
 
     // Clear build selection when selecting table cards
-    setSelectedBuild(null);
+    setSelectedBuilds([]);
 
     // Toggle table card selection
     const isSelected = selectedTableCards.some(tc => tc.index === tableIndex);
@@ -180,18 +180,49 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // PRIORITY 1: Check if a build is selected
-    if (selectedBuild) {
-      await captureBuild(selectedBuild.index);
-      setSelectedBuild(null);
-      return;
-    }
-
-    // PRIORITY 2: Check for table card captures
     const { card: playedCard, index: handIndex } = selectedCard;
     const tableCards = gameState.tableCards || [];
     const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
 
+    // PRIORITY 1: Check if builds AND table cards are BOTH selected (combined capture)
+    if (selectedBuilds.length > 0 && selectedIndices.length > 0) {
+      // Can only combine table cards with ONE build at a time
+      if (selectedBuilds.length > 1) {
+        setMessage('Can only combine table cards with ONE build at a time!');
+        return;
+      }
+      
+      await captureBuildWithTableCards(selectedBuilds[0].index, selectedIndices);
+      setSelectedBuilds([]);
+      setSelectedTableCards([]);
+      return;
+    }
+
+    // PRIORITY 2: Check if ONLY builds are selected (no table cards)
+    if (selectedBuilds.length > 0) {
+      // Validate all builds have same value and match the played card
+      const buildValue = selectedBuilds[0].build.value;
+      
+      // Check if all selected builds have the same value
+      const allSameValue = selectedBuilds.every(sb => sb.build.value === buildValue);
+      if (!allSameValue) {
+        setMessage('All selected builds must have the same value!');
+        return;
+      }
+      
+      // Check if played card matches build value
+      if (playedCard.rank !== buildValue) {
+        setMessage(`You need a ${buildValue} to capture these builds!`);
+        return;
+      }
+      
+      // Capture all selected builds
+      await captureMultipleBuilds(selectedBuilds.map(sb => sb.index));
+      setSelectedBuilds([]);
+      return;
+    }
+
+    // PRIORITY 3: Check for ONLY table card captures (no builds)
     if (selectedIndices.length === 0) {
       // No cards selected - show available captures
       const validCombos = findCapturableCombinations(tableCards, playedCard.rank);
@@ -631,7 +662,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     console.log('=== BUILD DEBUG ===');
     console.log('selectedCard:', selectedCard);
     console.log('selectedTableCards:', selectedTableCards);
-    console.log('selectedBuild:', selectedBuild);
+    console.log('selectedBuilds:', selectedBuilds);
     console.log('playerRole:', playerRole);
     
     if (!selectedCard) {
@@ -644,9 +675,15 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // CASE 1: Increasing an existing build
-    if (selectedBuild) {
-      await increaseBuild(selectedBuild.index);
+    // CASE 1: Increasing an existing build (only one build can be increased at a time)
+    if (selectedBuilds.length === 1) {
+      await increaseBuild(selectedBuilds[0].index);
+      return;
+    }
+
+    // Can't increase multiple builds
+    if (selectedBuilds.length > 1) {
+      setMessage('Can only increase one build at a time!');
       return;
     }
 
@@ -747,7 +784,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
       setSelectedCard(null);
       setSelectedTableCards([]);
-      setSelectedBuild(null);
+      setSelectedBuilds([]);
       setMessage(`${validValuesUnder10[0].description} created!`);
     } catch (error) {
       console.error('Error creating build:', error);
@@ -849,7 +886,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       await update(gameStateRef, updates);
 
       setSelectedCard(null);
-      setSelectedBuild(null);
+      setSelectedBuilds([]);
       if (newBuildValue === build.value) {
         setMessage(`Added to build of ${build.value}!`);
       } else {
@@ -1047,22 +1084,38 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
     // Check if hand card matches build value for capture
     if (selectedCard.card.rank === build.value) {
-      // Toggle selection for capture
-      if (selectedBuild?.index === buildIndex) {
-        setSelectedBuild(null);
+      // Toggle selection for capture - support multiple builds
+      const isAlreadySelected = selectedBuilds.some(sb => sb.index === buildIndex);
+      
+      if (isAlreadySelected) {
+        // Deselect this build
+        setSelectedBuilds(selectedBuilds.filter(sb => sb.index !== buildIndex));
         setMessage('Build deselected');
       } else {
-        setSelectedBuild({ build, index: buildIndex });
-        setMessage(`Build of ${build.value} selected. Click Capture to take it, or Build to increase it.`);
+        // Check if this build has same value as already selected builds
+        if (selectedBuilds.length > 0 && selectedBuilds[0].build.value !== build.value) {
+          setMessage(`Can only select builds of the same value! Already selected builds of ${selectedBuilds[0].build.value}.`);
+          return;
+        }
+        
+        // Add to selection
+        setSelectedBuilds([...selectedBuilds, { build, index: buildIndex }]);
+        const count = selectedBuilds.length + 1;
+        setMessage(count === 1 
+          ? `Build of ${build.value} selected. Click Capture or select more builds.`
+          : `${count} builds of ${build.value} selected. Click Capture.`);
       }
     } else {
       // Card doesn't match - maybe they want to increase the build
-      // Toggle selection for increasing
-      if (selectedBuild?.index === buildIndex) {
-        setSelectedBuild(null);
+      // For increase, only allow single build selection
+      const isAlreadySelected = selectedBuilds.some(sb => sb.index === buildIndex);
+      
+      if (isAlreadySelected) {
+        setSelectedBuilds(selectedBuilds.filter(sb => sb.index === buildIndex));
         setMessage('Build deselected');
       } else {
-        setSelectedBuild({ build, index: buildIndex });
+        // Clear previous selections and select only this one for increasing
+        setSelectedBuilds([{ build, index: buildIndex }]);
         setMessage(`Build selected. Click Build to add your ${selectedCard.card.rank} to this build.`);
       }
     }
@@ -1161,6 +1214,212 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     } catch (error) {
       console.error('Error capturing build:', error);
       setMessage('Error capturing build. Please try again.');
+    }
+  }
+
+  async function captureMultipleBuilds(buildIndices) {
+    console.log('=== CAPTURE MULTIPLE BUILDS DEBUG ===');
+    console.log('buildIndices:', buildIndices);
+    console.log('selectedCard:', selectedCard);
+    
+    if (!selectedCard) {
+      console.error('No selected card for builds capture');
+      setMessage('Error: No card selected');
+      return;
+    }
+    
+    const builds = gameState.builds || [];
+    const selectedBuildsData = buildIndices.map(idx => builds[idx]).filter(b => b);
+    
+    if (selectedBuildsData.length === 0) {
+      console.error('No builds found');
+      setMessage('Error: Builds not found');
+      return;
+    }
+
+    const { card: playedCard, index: handIndex } = selectedCard;
+
+    // Remove played card from hand
+    const handKey = `${playerRole}Hand`;
+    const currentHand = gameState[handKey];
+    
+    if (!currentHand || !Array.isArray(currentHand)) {
+      console.error('Hand not array in capture builds:', handKey, currentHand);
+      setMessage('Error: Invalid hand state');
+      return;
+    }
+    
+    const newHand = currentHand.filter((_, idx) => idx !== handIndex);
+
+    // Remove all selected builds
+    const newBuilds = builds.filter((_, i) => !buildIndices.includes(i));
+
+    // Collect all cards from all builds
+    const allBuildCards = selectedBuildsData.flatMap(build => build.cards || []);
+    
+    // Add to captured pile
+    const capturedKey = `${playerRole}Captured`;
+    const currentCaptured = gameState[capturedKey] || [];
+    const newCaptured = [...currentCaptured, playedCard, ...allBuildCards];
+
+    console.log('Capturing multiple builds:', {
+      count: selectedBuildsData.length,
+      totalCards: allBuildCards.length,
+      newCapturedTotal: newCaptured.length
+    });
+
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    // Generate play message
+    const activePlayerName = gameState.currentTurn === 'player1' ? 
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
+    const playedCardStr = formatCardForMessage(playedCard);
+    const buildValue = selectedBuildsData[0].value;
+    const msgText = selectedBuildsData.length === 1 
+      ? `${activePlayerName} captured a build of ${buildValue} with a ${playedCardStr}`
+      : `${activePlayerName} captured ${selectedBuildsData.length} builds of ${buildValue} with a ${playedCardStr}`;
+    
+    const updates = {
+      [handKey]: newHand,
+      builds: newBuilds,
+      [capturedKey]: newCaptured,
+      currentTurn: nextTurn,
+      lastCapture: playerRole,
+      lastPlayMessage: msgText,
+      lastPlayTimestamp: Date.now()
+    };
+
+    console.log('Sending capture multiple builds updates:', updates);
+
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+
+      soundManager.play('capture');
+      
+      setSelectedCard(null);
+      if (selectedBuildsData.length === 1) {
+        setMessage(`You captured the build of ${buildValue}!`);
+      } else {
+        setMessage(`You captured ${selectedBuildsData.length} builds of ${buildValue}!`);
+      }
+    } catch (error) {
+      console.error('Error capturing builds:', error);
+      setMessage('Error capturing builds. Please try again.');
+    }
+  }
+
+  async function captureBuildWithTableCards(buildIndex, tableIndices) {
+    console.log('=== CAPTURE BUILD WITH TABLE CARDS DEBUG ===');
+    console.log('buildIndex:', buildIndex);
+    console.log('tableIndices:', tableIndices);
+    console.log('selectedCard:', selectedCard);
+    
+    if (!selectedCard) {
+      console.error('No selected card');
+      setMessage('Error: No card selected');
+      return;
+    }
+    
+    const builds = gameState.builds || [];
+    const build = builds[buildIndex];
+    
+    if (!build) {
+      console.error('Build not found:', buildIndex);
+      setMessage('Error: Build not found');
+      return;
+    }
+
+    const { card: playedCard, index: handIndex } = selectedCard;
+    const tableCards = gameState.tableCards || [];
+    
+    // Get selected table cards
+    const selectedTableCardsList = tableIndices.map(idx => tableCards[idx]);
+    
+    // Calculate build sum
+    const buildSum = build.cards.reduce((sum, c) => sum + c.rank, 0);
+    
+    // Calculate table cards sum
+    const tableSum = selectedTableCardsList.reduce((sum, c) => sum + c.rank, 0);
+    
+    // Total must equal played card rank
+    const total = buildSum + tableSum;
+    
+    if (total !== playedCard.rank) {
+      setMessage(`Build (${buildSum}) + table cards (${tableSum}) = ${total}, but you played a ${playedCard.rank}!`);
+      return;
+    }
+
+    // Remove played card from hand
+    const handKey = `${playerRole}Hand`;
+    const currentHand = gameState[handKey];
+    
+    if (!currentHand || !Array.isArray(currentHand)) {
+      console.error('Hand not array:', handKey, currentHand);
+      setMessage('Error: Invalid hand state');
+      return;
+    }
+    
+    const newHand = currentHand.filter((_, idx) => idx !== handIndex);
+
+    // Remove build
+    const newBuilds = builds.filter((_, i) => i !== buildIndex);
+
+    // Remove selected table cards
+    const newTableCards = tableCards.filter((_, idx) => !tableIndices.includes(idx));
+    
+    // Add everything to captured pile
+    const capturedKey = `${playerRole}Captured`;
+    const currentCaptured = gameState[capturedKey] || [];
+    const buildCards = build.cards || [];
+    const newCaptured = [...currentCaptured, playedCard, ...buildCards, ...selectedTableCardsList];
+
+    console.log('Capturing build + table cards:', {
+      buildValue: build.value,
+      buildCards: buildCards.length,
+      tableCards: selectedTableCardsList.length,
+      newCapturedTotal: newCaptured.length
+    });
+
+    // Switch turn
+    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
+
+    // Generate play message
+    const activePlayerName = gameState.currentTurn === 'player1' ? 
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
+    const playedCardStr = formatCardForMessage(playedCard);
+    
+    // Format table cards for message
+    const tableCardsStr = selectedTableCardsList.map(c => formatCardForMessage(c)).join(' + ');
+    const msgText = `${activePlayerName} captured ${tableCardsStr} + build of ${build.value} with a ${playedCardStr}`;
+    
+    const updates = {
+      [handKey]: newHand,
+      builds: newBuilds,
+      tableCards: newTableCards,
+      [capturedKey]: newCaptured,
+      currentTurn: nextTurn,
+      lastCapture: playerRole,
+      lastPlayMessage: msgText,
+      lastPlayTimestamp: Date.now()
+    };
+
+    console.log('Sending capture build+table updates:', updates);
+
+    try {
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
+
+      soundManager.play('capture');
+      
+      setSelectedCard(null);
+      setMessage(`You captured ${selectedTableCardsList.length} table card(s) + build of ${build.value}!`);
+    } catch (error) {
+      console.error('Error capturing build with table cards:', error);
+      setMessage('Error capturing. Please try again.');
     }
   }
 
@@ -1519,7 +1778,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
             {builds.map((build, i) => (
               <div
                 key={`build-${i}`}
-                className={`build-pile ${selectedBuild?.index === i ? 'selected' : ''}`}
+                className={`build-pile ${selectedBuilds.some(sb => sb.index === i) ? 'selected' : ''}`}
                 onClick={() => handleBuildClick(build, i)}
               >
                 <div className="build-label">Building {build.value}</div>
@@ -1565,7 +1824,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
           <button onClick={handleCapture} disabled={!selectedCard || !isMyTurn}>
             Capture
           </button>
-          <button onClick={handleBuild} disabled={!selectedCard || (selectedTableCards.length === 0 && !selectedBuild) || !isMyTurn}>
+          <button onClick={handleBuild} disabled={!selectedCard || (selectedTableCards.length === 0 && selectedBuilds.length === 0) || !isMyTurn}>
             Build
           </button>
           <button onClick={handleTrail} disabled={!selectedCard || !isMyTurn}>
