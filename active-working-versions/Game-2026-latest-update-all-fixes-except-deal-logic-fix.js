@@ -921,8 +921,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         const player2Hand = deck.slice(cardsPerPlayer, cardsPerPlayer * 2);
         const remainingDeck = deck.slice(cardsPerPlayer * 2);
 
-        // Keep same dealer throughout the round - dealer switches between rounds
-        const newDealer = gameState.currentDealer;  // DON'T switch during round
+        // Switch dealer and set turn to non-dealer
+        const newDealer = gameState.currentDealer === 'player1' ? 'player2' : 'player1';
         const newTurn = newDealer === 'player1' ? 'player2' : 'player1';
 
         const updates = {
@@ -1034,11 +1034,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
     // Check if game is over (someone reached 21+)
     const gameOver = p1TotalScore >= 21 || p2TotalScore >= 21;
-    
-    // Winner is whoever has the HIGHER score when game is over
-    const winner = gameOver 
-      ? (p1TotalScore > p2TotalScore ? 'player1' : 'player2')
-      : null;
+    const winner = p1TotalScore >= 21 ? 'player1' : (p2TotalScore >= 21 ? 'player2' : null);
 
     console.log('Game over check:', { gameOver, winner, p1TotalScore, p2TotalScore });
 
@@ -1499,7 +1495,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         player1Captured: [],
         player2Captured: [],
         currentTurn: 'player2',
-        currentDealer: 'player1',  // Always start new game with Player 1 as dealer
+        currentDealer: 'player1',
         roundNumber: 1,
         player1Score: 0,
         player2Score: 0,
