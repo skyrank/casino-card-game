@@ -1348,15 +1348,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     // Calculate table cards sum
     const tableSum = selectedTableCardsList.reduce((sum, c) => sum + c.rank, 0);
     
-    // NEW LOGIC: Support two types of captures
-    // Type 1: Build + table cards ADD to played card (e.g., 7 + A = 8)
-    // Type 2: Build = played card AND table cards = played card (multiple capture, e.g., 10 + 10 = 10)
+    // Total must equal played card rank
+    const total = buildSum + tableSum;
     
-    const isAdditiveCap = (buildSum + tableSum) === playedCard.rank;
-    const isMultipleCapture = (buildSum === playedCard.rank) && (tableSum === playedCard.rank);
-    
-    if (!isAdditiveCap && !isMultipleCapture) {
-      setMessage(`Cannot capture: Build (${buildSum}) + table (${tableSum}) doesn't match your ${playedCard.rank}!`);
+    if (total !== playedCard.rank) {
+      setMessage(`Build (${buildSum}) + table cards (${tableSum}) = ${total}, but you played a ${playedCard.rank}!`);
       return;
     }
 
@@ -1402,11 +1398,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     
     // Format table cards for message
     const tableCardsStr = selectedTableCardsList.map(c => formatCardForMessage(c)).join(' + ');
-    
-    // Determine if this is additive or multiple capture for message
-    const msgText = isMultipleCapture
-      ? `${activePlayerName} captured ${tableCardsStr} (${tableSum}) + build of ${build.value} with a ${playedCardStr}`
-      : `${activePlayerName} captured ${tableCardsStr} + build of ${build.value} with a ${playedCardStr}`;
+    const msgText = `${activePlayerName} captured ${tableCardsStr} + build of ${build.value} with a ${playedCardStr}`;
     
     const updates = {
       [handKey]: newHand,
