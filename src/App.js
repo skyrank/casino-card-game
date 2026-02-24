@@ -220,6 +220,55 @@ function App() {
     }
   };
 
+  // Handle playing against AI
+  const handlePlayAI = async (code, name) => {
+    try {
+      setError(null);
+      const gameRef = ref(database, `casino-games/${code}`);
+      
+      // Create AI game - start immediately with AI as player2
+      await set(gameRef, {
+        roomCode: code,
+        status: 'playing',
+        isAiGame: true,  // Flag to indicate this is an AI game
+        createdAt: Date.now(),
+        players: {
+          player1: {
+            name: name,
+            joinedAt: Date.now(),
+            connected: true
+          },
+          player2: {
+            name: 'AI Opponent',
+            joinedAt: Date.now(),
+            connected: true,
+            isAI: true
+          }
+        }
+      });
+      
+      setRoomCode(code);
+      setPlayerName(name);
+      setPlayerRole('player1');
+      setOpponentName('AI Opponent');
+      setGamePhase('playing');
+
+      // Save to localStorage
+      localStorage.setItem('casinoGame', JSON.stringify({
+        roomCode: code,
+        playerName: name,
+        playerRole: 'player1',
+        isAiGame: true
+      }));
+
+      return true;
+    } catch (err) {
+      console.error('Error creating AI game:', err);
+      setError('Failed to create AI game. Please try again.');
+      return false;
+    }
+  };
+
   // Try to reconnect on page load
   useEffect(() => {
     const savedGame = localStorage.getItem('casinoGame');
@@ -264,6 +313,7 @@ function App() {
         <GameLobby 
           onCreateGame={handleCreateGame}
           onJoinGame={handleJoinGame}
+          onPlayAI={handlePlayAI}
           error={error}
         />
       )}

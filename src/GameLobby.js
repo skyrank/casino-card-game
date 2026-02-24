@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './GameLobby.css';
 
-function GameLobby({ onCreateGame, onJoinGame, error }) {
+function GameLobby({ onCreateGame, onJoinGame, onPlayAI, error }) {
   const [playerName, setPlayerName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -9,6 +9,24 @@ function GameLobby({ onCreateGame, onJoinGame, error }) {
   const validateRoomName = (name) => {
     // Must be 4-8 uppercase letters
     return /^[A-Z]{4,8}$/.test(name);
+  };
+
+  const handlePlayAI = async () => {
+    // Only need player name for AI games
+    if (!playerName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+    
+    setIsLoading(true);
+    // Generate a unique room code for AI game
+    const aiRoomCode = 'AI' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const success = await onPlayAI(aiRoomCode, playerName);
+    setIsLoading(false);
+    
+    if (!success) {
+      // Error will be shown via error prop
+    }
   };
 
   const handleNewGame = async () => {
@@ -100,7 +118,7 @@ function GameLobby({ onCreateGame, onJoinGame, error }) {
             maxLength={8}
             disabled={isLoading}
           />
-          <p className="helper-text">4-8 letters (e.g., JOESIG)</p>
+          <p className="helper-text">For multiplayer games (optional for AI)</p>
         </div>
 
         <div className="button-section">
@@ -118,6 +136,18 @@ function GameLobby({ onCreateGame, onJoinGame, error }) {
             disabled={!playerName.trim() || !roomName.trim() || isLoading}
           >
             {isLoading ? 'Joining...' : 'Join Game'}
+          </button>
+        </div>
+
+        <div className="divider">OR</div>
+
+        <div className="button-section">
+          <button 
+            className="ai-game-button"
+            onClick={handlePlayAI}
+            disabled={!playerName.trim() || isLoading}
+          >
+            {isLoading ? 'Starting...' : 'Play vs AI'}
           </button>
         </div>
       </div>

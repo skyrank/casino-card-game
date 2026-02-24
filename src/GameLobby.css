@@ -117,6 +117,39 @@
   transform: none;
 }
 
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  color: #999;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.ai-game-button {
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: #9b59b6;
+  color: white;
+}
+
+.ai-game-button:hover:not(:disabled) {
+  background: #8e44ad;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.4);
+}
+
+.ai-game-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Mobile responsive */
 @media (max-width: 600px) {
   .lobby-card {
