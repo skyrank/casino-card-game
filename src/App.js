@@ -16,15 +16,23 @@ function App() {
 
   // Handle leaving the game - wrapped in useCallback to prevent recreation
   const handleLeaveGame = useCallback(async () => {
-    if (roomCode) {
+    if (roomCode && playerRole) {
       try {
-        const gameRef = ref(database, `casino-games/${roomCode}`);
-        await remove(gameRef);
+        // DON'T delete the room - just mark player as disconnected
+        // This preserves the match history and allows rejoining
+        const playerRef = ref(database, `casino-games/${roomCode}/players/${playerRole}`);
+        await update(playerRef, {
+          connected: false,
+          disconnectedAt: Date.now()
+        });
+        
+        console.log('Player disconnected from room, room preserved');
       } catch (err) {
         console.error('Error leaving game:', err);
       }
     }
     
+    // Clear local state and return to lobby
     localStorage.removeItem('casinoGame');
     setGamePhase('lobby');
     setRoomCode(null);
@@ -32,7 +40,7 @@ function App() {
     setPlayerName('');
     setOpponentName('');
     setError(null);
-  }, [roomCode]);
+  }, [roomCode, playerRole]);
 
   // Listen to game state changes
   useEffect(() => {
@@ -44,8 +52,8 @@ function App() {
       const data = snapshot.val();
       
       if (!data) {
-        // Game was deleted
-        console.log('Game deleted, returning to lobby');
+        // Room was manually deleted (rare - shouldn't happen with new logic)
+        console.log('Room no longer exists');
         handleLeaveGame();
         return;
       }
@@ -133,6 +141,13 @@ function App() {
 
       // Check if player name matches Player 1 - allow rejoin
       if (gameData.players?.player1?.name === name) {
+        // Mark player as connected
+        const playerRef = ref(database, `casino-games/${code}/players/player1`);
+        await update(playerRef, {
+          connected: true,
+          reconnectedAt: Date.now()
+        });
+        
         setRoomCode(code);
         setPlayerName(name);
         setPlayerRole('player1');
@@ -161,6 +176,13 @@ function App() {
 
       // Check if player name matches Player 2 - allow rejoin
       if (gameData.players?.player2?.name === name) {
+        // Mark player as connected
+        const playerRef = ref(database, `casino-games/${code}/players/player2`);
+        await update(playerRef, {
+          connected: true,
+          reconnectedAt: Date.now()
+        });
+        
         setRoomCode(code);
         setPlayerName(name);
         setPlayerRole('player2');
