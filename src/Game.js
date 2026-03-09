@@ -184,8 +184,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
       return;
     }
 
-    // Clear build selection when selecting table cards
-    setSelectedBuilds([]);
+    // DON'T clear build selection - allow selecting builds AND table cards together
 
     // Toggle table card selection
     const isSelected = selectedTableCards.some(tc => tc.index === tableIndex);
@@ -1067,13 +1066,16 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     const gameOver = p1TotalScore >= 21 || p2TotalScore >= 21;
     
     // Winner is whoever has the HIGHER score when game is over
+    // If tied, winner is 'tie'
     const winner = gameOver 
-      ? (p1TotalScore > p2TotalScore ? 'player1' : 'player2')
+      ? (p1TotalScore > p2TotalScore ? 'player1' : 
+         p2TotalScore > p1TotalScore ? 'player2' : 
+         'tie')
       : null;
 
     console.log('Game over check:', { gameOver, winner, p1TotalScore, p2TotalScore });
 
-    // Increment win counter if someone won
+    // Increment win counter if someone won (no increment for ties)
     const currentP1Wins = gameState.player1Wins || 0;
     const currentP2Wins = gameState.player2Wins || 0;
     const newP1Wins = gameOver && winner === 'player1' ? currentP1Wins + 1 : currentP1Wins;
@@ -1373,8 +1375,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     // Get selected table cards
     const selectedTableCardsList = tableIndices.map(idx => tableCards[idx]);
     
-    // Calculate build sum
-    const buildSum = build.cards.reduce((sum, c) => sum + c.rank, 0);
+    // Calculate build value (use declared value, not sum of cards)
+    const buildSum = build.value;
     
     // Calculate table cards sum
     const tableSum = selectedTableCardsList.reduce((sum, c) => sum + c.rank, 0);
@@ -1828,7 +1830,12 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
     const p1RoundScore = gameState.player1Score || 0;  // This round's score
     const p2RoundScore = gameState.player2Score || 0;  // This round's score
     const winnerRole = gameState.winner;
-    const winnerName = winnerRole === playerRole ? playerName : opponentName;
+    
+    // Handle tie vs regular winner
+    const isTie = winnerRole === 'tie';
+    const winnerName = isTie 
+      ? null 
+      : (winnerRole === playerRole ? playerName : opponentName);
 
     const handleNewGame = async () => {
       // Only Player 1 should create new game
@@ -1888,7 +1895,9 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         </div>
 
         <div className="game-over">
-          <h1>🏆 {winnerName} Wins! 🏆</h1>
+          <h1>
+            {isTie ? '🤝 Tie Game! 🤝' : `🏆 ${winnerName} Wins! 🏆`}
+          </h1>
           
           <div className="final-scores">
             <h2>Final Score</h2>
