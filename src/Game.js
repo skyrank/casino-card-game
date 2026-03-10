@@ -1844,6 +1844,12 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         return;
       }
 
+      // DEALER ALTERNATION: Alternate dealer from previous game
+      // This ensures both players get equal first-move opportunities across games
+      const lastDealer = gameState.currentDealer || 'player1';
+      const newDealer = lastDealer === 'player1' ? 'player2' : 'player1';
+      const newFirstPlayer = newDealer === 'player1' ? 'player2' : 'player1';
+
       // Start completely fresh game but PRESERVE wins counter
       const deck = shuffleDeck(createDeck());
       const { player1Hand, player2Hand, tableCards, deck: remainingDeck } = dealInitialCards(deck);
@@ -1855,8 +1861,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         tableCards,
         player1Captured: [],
         player2Captured: [],
-        currentTurn: 'player2',
-        currentDealer: 'player1',  // Always start new game with Player 1 as dealer
+        currentTurn: newFirstPlayer,  // Alternates based on new dealer
+        currentDealer: newDealer,      // Alternates from previous game
         roundNumber: 1,
         player1Score: 0,
         player2Score: 0,
@@ -1874,7 +1880,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
 
       const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
       await set(gameStateRef, initialState);
-      setMessage('New game started!');
+      setMessage(`New game started! ${newDealer === 'player1' ? (playerRole === 'player1' ? playerName : opponentName) : (playerRole === 'player2' ? playerName : opponentName)} deals first.`);
     };
 
     return (
