@@ -5,6 +5,7 @@ import GameLobby from './GameLobby';
 import WaitingRoom from './WaitingRoom';
 import { database } from './firebase';
 import { ref, set, onValue, update, remove, get } from 'firebase/database';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   const [gamePhase, setGamePhase] = useState('lobby'); // 'lobby', 'waiting', 'playing'
@@ -357,6 +358,7 @@ function App() {
           onLeaveGame={handleLeaveGame}
         />
       )}
+      <Analytics />
     </div>
   );
 }
