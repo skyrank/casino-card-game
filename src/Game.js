@@ -2010,6 +2010,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
         player2TotalScore: 0,
         player1Wins: gameState.player1Wins || 0,  // PRESERVE wins
         player2Wins: gameState.player2Wins || 0,  // PRESERVE wins
+        isAiGame: gameState.isAiGame || false,    // PRESERVE AI mode
         lastCapture: null,
         builds: [],
         roundEnded: false,
