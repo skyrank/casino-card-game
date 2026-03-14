@@ -6,7 +6,7 @@ import { database } from './firebase';
 import { ref, set, onValue, update, get } from 'firebase/database';
 import soundManager from './soundManager';
 
-function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isLocalMode = false }) {
+function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame }) {
   const [gameState, setGameState] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [message, setMessage] = useState('');
@@ -15,10 +15,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
   const [isDealing, setIsDealing] = useState(false);  // Prevent duplicate deals
   const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
   const [playMessage, setPlayMessage] = useState(null);  // Animated message for plays
-
-  // Local mode defaults (guest mode - no Firebase)
-  const effectivePlayerRole = isLocalMode ? 'player1' : playerRole;
-  const effectiveOpponentName = isLocalMode ? 'AI Opponent' : opponentName;
 
   // Initialize sound manager
   useEffect(() => {
@@ -33,9 +29,9 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     showPlayMessage(gameState.lastPlayMessage);
   }, [gameState?.lastPlayTimestamp]); // Trigger when timestamp changes
 
-  // Listen to Firebase for game state changes (skip in local mode)
+  // Listen to Firebase for game state changes
   useEffect(() => {
-    if (isLocalMode || !roomCode) return;
+    if (!roomCode) return;
 
     const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
     
@@ -46,29 +42,20 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         setGameState(data);
         
         // Update message based on turn
-        if (data.currentTurn === effectivePlayerRole) {
+        if (data.currentTurn === playerRole) {
           setMessage("Your turn! Select a card from your hand.");
         } else {
-          setMessage(`${effectiveOpponentName}'s turn...`);
+          setMessage(`${opponentName}'s turn...`);
         }
       }
     });
 
     return () => unsubscribe();
-  }, [roomCode, effectivePlayerRole, effectiveOpponentName, isLocalMode]);
+  }, [roomCode, playerRole, opponentName]);
 
-  // Initialize game
+  // Initialize game (only Player 1)
   useEffect(() => {
-    // Local mode: Start game immediately
-    if (isLocalMode) {
-      if (!gameState) {
-        startNewGame();
-      }
-      return;
-    }
-
-    // Firebase mode: Only Player 1 creates initial game
-    if (!roomCode || effectivePlayerRole !== 'player1') return;
+    if (!roomCode || playerRole !== 'player1') return;
 
     const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
     
@@ -79,21 +66,18 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         startNewGame();
       }
     }, { onlyOnce: true });
-  }, [roomCode, effectivePlayerRole, isLocalMode]);
+  }, [roomCode, playerRole]);
 
-  // STEP 3: Monitor gameState and trigger dealing when both hands empty
+  // STEP 3: Monitor Firebase gameState and trigger dealing when both hands empty
   useEffect(() => {
-    if (!gameState || isDealing) return;
-    
-    // In local mode, always handle dealing. In Firebase mode, only Player 1 handles it.
-    if (!isLocalMode && effectivePlayerRole !== 'player1') return;
+    if (!gameState || playerRole !== 'player1' || isDealing) return;
 
     const player1Hand = gameState.player1Hand || [];
     const player2Hand = gameState.player2Hand || [];
 
     // Check if both hands are empty and deck has cards
     if (player1Hand.length === 0 && player2Hand.length === 0 && gameState.deck && gameState.deck.length > 0) {
-      console.log('Both hands empty detected - triggering deal');
+      console.log('Both hands empty detected in Firebase - triggering deal');
       setIsDealing(true);
       setTimeout(() => {
         checkForNextDeal();
@@ -109,20 +93,20 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         setIsDealing(false);
       }, 1500);
     }
-  }, [gameState?.player1Hand?.length, gameState?.player2Hand?.length, gameState?.deck?.length, effectivePlayerRole, isDealing, gameState?.roundEnded, isLocalMode]);
+  }, [gameState?.player1Hand?.length, gameState?.player2Hand?.length, gameState?.deck?.length, playerRole, isDealing, gameState?.roundEnded]);
 
   // AI Move Logic - Trigger when it's AI's turn
   useEffect(() => {
     if (!gameState) return;
     
     // Check if this is an AI game and it's player2's turn
-    const isAiGame = gameState.isAiGame || isLocalMode; // Local mode is always AI
+    const isAiGame = gameState.isAiGame || false;
     const isAiTurn = gameState.currentTurn === 'player2';
     const aiHasCards = (gameState.player2Hand?.length || 0) > 0;
     
-    console.log('AI Turn Check:', { isAiGame, isAiTurn, playerRole: effectivePlayerRole, currentTurn: gameState.currentTurn, aiHandLength: gameState.player2Hand?.length });
+    console.log('AI Turn Check:', { isAiGame, isAiTurn, playerRole, currentTurn: gameState.currentTurn, aiHandLength: gameState.player2Hand?.length });
     
-    if (isAiGame && isAiTurn && effectivePlayerRole === 'player1' && aiHasCards) {
+    if (isAiGame && isAiTurn && playerRole === 'player1' && aiHasCards) {
       console.log('AI should move in 3 seconds...');
       // Delay AI move for better UX - gives time to see messages
       const aiMoveTimer = setTimeout(() => {
@@ -131,39 +115,19 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       
       return () => clearTimeout(aiMoveTimer);
     }
-  }, [gameState?.currentTurn, gameState?.isAiGame, gameState?.player2Hand?.length, effectivePlayerRole, isLocalMode]);
-
-  // Helper function: Update game state (Firebase or local)
-  async function updateGameState(updates) {
-    if (isLocalMode) {
-      // Local mode: Update React state directly
-      setGameState(prevState => ({
-        ...prevState,
-        ...updates
-      }));
-    } else {
-      // Firebase mode: Update database
-      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-      await update(gameStateRef, updates);
-    }
-  }
+  }, [gameState?.currentTurn, gameState?.isAiGame, gameState?.player2Hand?.length, playerRole]);
 
   async function startNewGame() {
     const deck = shuffleDeck(createDeck());
     const { player1Hand, player2Hand, tableCards, deck: remainingDeck } = dealInitialCards(deck);
 
-    // Check for isAiGame flag
-    let isAiGame = isLocalMode; // Local mode is always AI
+    // Check Firebase for isAiGame flag from the room data
+    const gameRoomRef = ref(database, `casino-games/${roomCode}`);
+    const roomSnapshot = await get(gameRoomRef);
+    const roomData = roomSnapshot.val();
+    const isAiGame = roomData?.isAiGame || false;
     
-    if (!isLocalMode) {
-      // Firebase mode: Check room data for isAiGame flag
-      const gameRoomRef = ref(database, `casino-games/${roomCode}`);
-      const roomSnapshot = await get(gameRoomRef);
-      const roomData = roomSnapshot.val();
-      isAiGame = roomData?.isAiGame || false;
-    }
-    
-    console.log('Starting new game, isAiGame:', isAiGame, 'isLocalMode:', isLocalMode);
+    console.log('Starting new game, isAiGame:', isAiGame);
 
     const initialState = {
       deck: remainingDeck,
@@ -186,27 +150,21 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       isAiGame: isAiGame        // PRESERVE AI flag
     };
 
-    if (isLocalMode) {
-      // Local mode: Set state directly
-      setGameState(initialState);
-    } else {
-      // Firebase mode: Save to database
-      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-      await set(gameStateRef, initialState);
-    }
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await set(gameStateRef, initialState);
   }
 
   function handleCardClick(card, source, index) {
     if (!gameState) return;
 
     // Only allow current player to select their cards
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
 
-    if (source === 'player1Hand' && effectivePlayerRole !== 'player1') return;
-    if (source === 'player2Hand' && effectivePlayerRole !== 'player2') return;
+    if (source === 'player1Hand' && playerRole !== 'player1') return;
+    if (source === 'player2Hand' && playerRole !== 'player2') return;
 
     soundManager.play('cardSelect'); // Play card selection sound
     setSelectedCard({ card, source, index });
@@ -221,7 +179,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       return;
     }
 
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
@@ -247,7 +205,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       return;
     }
 
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
@@ -258,37 +216,13 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // PRIORITY 1: Check if builds AND table cards are BOTH selected (combined capture)
     if (selectedBuilds.length > 0 && selectedIndices.length > 0) {
-      // Allow multiple builds + table cards if they all equal the played card value
-      const buildValue = selectedBuilds[0].build.value;
-      
-      // Check all builds have same value
-      const allSameValue = selectedBuilds.every(sb => sb.build.value === buildValue);
-      if (!allSameValue) {
-        setMessage('All selected builds must have the same value!');
+      // Can only combine table cards with ONE build at a time
+      if (selectedBuilds.length > 1) {
+        setMessage('Can only combine table cards with ONE build at a time!');
         return;
       }
       
-      // Check if played card matches build value
-      if (playedCard.rank !== buildValue) {
-        setMessage(`You need a ${buildValue} to capture these builds!`);
-        return;
-      }
-      
-      // Calculate table cards sum
-      const tableCards = gameState.tableCards || [];
-      const selectedTableCardsList = selectedIndices.map(idx => tableCards[idx]);
-      const tableSum = selectedTableCardsList.reduce((sum, c) => sum + c.rank, 0);
-      
-      // Check if this is a valid multiple capture (all equal played card)
-      const isMultipleCapture = (buildValue === playedCard.rank) && (tableSum === playedCard.rank);
-      
-      if (!isMultipleCapture) {
-        setMessage(`Cannot capture: Build (${buildValue}) + table (${tableSum}) must both equal your ${playedCard.rank}!`);
-        return;
-      }
-      
-      // Capture ALL builds + table cards
-      await captureMultipleBuildsWithTableCards(selectedBuilds.map(sb => sb.index), selectedIndices);
+      await captureBuildWithTableCards(selectedBuilds[0].index, selectedIndices);
       setSelectedBuilds([]);
       setSelectedTableCards([]);
       return;
@@ -331,7 +265,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     }
 
     // NEW: Check if player has active builds and validate capture accordingly
-    const myBuilds = (gameState.builds || []).filter(b => b.owner === effectivePlayerRole);
+    const myBuilds = (gameState.builds || []).filter(b => b.owner === playerRole);
     
     if (myBuilds.length > 0) {
       // Player has active builds - check if this capture violates build rules
@@ -478,7 +412,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('=== CAPTURE CARDS DEBUG ===');
     console.log('tableIndices:', tableIndices);
     console.log('selectedCard:', selectedCard);
-    console.log('playerRole:', effectivePlayerRole);
+    console.log('playerRole:', playerRole);
     console.log('gameState.player1Hand:', gameState?.player1Hand);
     console.log('gameState.player2Hand:', gameState?.player2Hand);
     console.log('gameState.tableCards:', gameState?.tableCards);
@@ -538,8 +472,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     
     // Generate play message - use the CURRENT TURN player, not viewer's role
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const capturedCardsStr = capturedTableCards.map(c => formatCardForMessage(c)).join(', ');
     const playedCardStr = formatCardForMessage(playedCard);
     const msgText = `${activePlayerName} captured ${capturedCardsStr} with a ${playedCardStr}`;
@@ -560,7 +494,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending updates:', updates);
     
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
       
       soundManager.play('capture'); // Play capture sound
       
@@ -576,7 +511,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
   async function handleTrail() {
     console.log('=== TRAIL DEBUG ===');
     console.log('selectedCard:', selectedCard);
-    console.log('playerRole:', effectivePlayerRole);
+    console.log('playerRole:', playerRole);
     console.log('gameState.player1Hand:', gameState?.player1Hand);
     console.log('gameState.player2Hand:', gameState?.player2Hand);
     console.log('gameState.tableCards:', gameState?.tableCards);
@@ -586,14 +521,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       return;
     }
 
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
 
     // CASINO RULE: Cannot trail if you own an active build
     const currentBuilds = gameState.builds || [];
-    const playerHasActiveBuild = currentBuilds.some(build => build.owner === effectivePlayerRole);
+    const playerHasActiveBuild = currentBuilds.some(build => build.owner === playerRole);
     
     if (playerHasActiveBuild) {
       setMessage("You can't trail - you must capture your build first!");
@@ -635,8 +570,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // Generate play message - use the CURRENT TURN player, not viewer's role
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const trailedCardStr = formatCardForMessage(playedCard);
     const msgText = `${activePlayerName} trailed a ${trailedCardStr}`;
     
@@ -646,7 +581,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     console.log('Sending trail updates:', updates);
 
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
 
     soundManager.play('trail'); // Play trail sound
     
@@ -757,14 +693,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('selectedCard:', selectedCard);
     console.log('selectedTableCards:', selectedTableCards);
     console.log('selectedBuilds:', selectedBuilds);
-    console.log('playerRole:', effectivePlayerRole);
+    console.log('playerRole:', playerRole);
     
     if (!selectedCard) {
       setMessage('Select a hand card first!');
       return;
     }
 
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
@@ -854,8 +790,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // Generate play message - use the CURRENT TURN player, not viewer's role
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const msgText = `${activePlayerName} is building ${buildValue}s`;
     
     // Switch turn
@@ -873,7 +809,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending build updates:', updates);
 
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
 
       setSelectedCard(null);
       setSelectedTableCards([]);
@@ -975,7 +912,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending increase build updates:', updates);
 
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
 
       setSelectedCard(null);
       setSelectedBuilds([]);
@@ -997,7 +935,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     }
     
     // Only Player 1 should deal new cards to avoid conflicts
-    if (effectivePlayerRole !== 'player1') {
+    if (playerRole !== 'player1') {
       console.log('checkForNextDeal: not player1, skipping');
       return;
     }
@@ -1028,7 +966,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
         console.log('Dealing new cards:', updates);
 
-        await updateGameState(updates);
+        const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+        await update(gameStateRef, updates);
         
         setMessage('New cards dealt!');
         setIsDealing(false);
@@ -1051,7 +990,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     }
     
     // Only Player 1 should end the round to avoid conflicts
-    if (effectivePlayerRole !== 'player1') {
+    if (playerRole !== 'player1') {
       console.log('endRound: not player1, skipping');
       return;
     }
@@ -1163,13 +1102,14 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       winner: winner
     };
 
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
 
-    setMessage(`Round Over! ${playerName}: ${effectivePlayerRole === 'player1' ? p1Score : p2Score} pts | ${effectiveOpponentName}: ${effectivePlayerRole === 'player1' ? p2Score : p1Score} pts`);
+    setMessage(`Round Over! ${playerName}: ${playerRole === 'player1' ? p1Score : p2Score} pts | ${opponentName}: ${playerRole === 'player1' ? p2Score : p1Score} pts`);
   }
 
   function handleBuildClick(build, buildIndex) {
-    if (gameState.currentTurn !== effectivePlayerRole) {
+    if (gameState.currentTurn !== playerRole) {
       setMessage("It's not your turn!");
       return;
     }
@@ -1283,8 +1223,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // Generate play message - use the CURRENT TURN player, not viewer's role
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const playedCardStr = formatCardForMessage(playedCard);
     const msgText = `${activePlayerName} captured a build of ${build.value} with a ${playedCardStr}`;
     
@@ -1301,7 +1241,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending capture build updates:', updates);
 
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
 
       soundManager.play('capture'); // Play capture sound
       
@@ -1369,8 +1310,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // Generate play message
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const playedCardStr = formatCardForMessage(playedCard);
     const buildValue = selectedBuildsData[0].value;
     const msgText = selectedBuildsData.length === 1 
@@ -1390,7 +1331,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending capture multiple builds updates:', updates);
 
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
 
       soundManager.play('capture');
       
@@ -1487,8 +1429,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // Generate play message
     const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
+      (playerRole === 'player1' ? playerName : opponentName) :
+      (playerRole === 'player2' ? playerName : opponentName);
     const playedCardStr = formatCardForMessage(playedCard);
     
     // Format table cards for message
@@ -1513,7 +1455,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     console.log('Sending capture build+table updates:', updates);
 
     try {
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
 
       soundManager.play('capture');
       
@@ -1521,121 +1464,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       setMessage(`You captured ${selectedTableCardsList.length} table card(s) + build of ${build.value}!`);
     } catch (error) {
       console.error('Error capturing build with table cards:', error);
-      setMessage('Error capturing. Please try again.');
-    }
-  }
-
-  async function captureMultipleBuildsWithTableCards(buildIndices, tableIndices) {
-    console.log('=== CAPTURE MULTIPLE BUILDS WITH TABLE CARDS DEBUG ===');
-    console.log('buildIndices:', buildIndices);
-    console.log('tableIndices:', tableIndices);
-    console.log('selectedCard:', selectedCard);
-    
-    if (!selectedCard) {
-      console.error('No selected card');
-      setMessage('Error: No card selected');
-      return;
-    }
-    
-    const builds = gameState.builds || [];
-    const selectedBuilds = buildIndices.map(idx => builds[idx]);
-    
-    if (selectedBuilds.some(b => !b)) {
-      console.error('One or more builds not found');
-      setMessage('Error: Build not found');
-      return;
-    }
-
-    const { card: playedCard, index: handIndex } = selectedCard;
-    const tableCards = gameState.tableCards || [];
-    
-    // Get selected table cards
-    const selectedTableCardsList = tableIndices.map(idx => tableCards[idx]);
-    
-    // All builds should have same value (already validated)
-    const buildValue = selectedBuilds[0].value;
-    
-    // Calculate table cards sum
-    const tableSum = selectedTableCardsList.reduce((sum, c) => sum + c.rank, 0);
-    
-    // This should be a multiple capture (already validated)
-    console.log('Multiple builds + table cards capture:', {
-      buildValue,
-      tableSum,
-      playedCardRank: playedCard.rank,
-      numBuilds: selectedBuilds.length
-    });
-
-    // Remove played card from hand
-    const handKey = `${playerRole}Hand`;
-    const currentHand = gameState[handKey];
-    
-    if (!currentHand || !Array.isArray(currentHand)) {
-      console.error('Hand not array:', handKey, currentHand);
-      setMessage('Error: Invalid hand state');
-      return;
-    }
-    
-    const newHand = currentHand.filter((_, idx) => idx !== handIndex);
-
-    // Remove all selected builds
-    const newBuilds = builds.filter((_, i) => !buildIndices.includes(i));
-
-    // Remove selected table cards
-    const newTableCards = tableCards.filter((_, idx) => !tableIndices.includes(idx));
-    
-    // Add everything to captured pile
-    const capturedKey = `${playerRole}Captured`;
-    const currentCaptured = gameState[capturedKey] || [];
-    
-    // Collect all cards from all builds
-    const allBuildCards = selectedBuilds.flatMap(build => build.cards || []);
-    
-    const newCaptured = [...currentCaptured, playedCard, ...allBuildCards, ...selectedTableCardsList];
-
-    console.log('Capturing multiple builds + table cards:', {
-      numBuilds: selectedBuilds.length,
-      buildCardsTotal: allBuildCards.length,
-      tableCards: selectedTableCardsList.length,
-      newCapturedTotal: newCaptured.length
-    });
-
-    // Switch turn
-    const nextTurn = gameState.currentTurn === 'player1' ? 'player2' : 'player1';
-
-    // Generate play message
-    const activePlayerName = gameState.currentTurn === 'player1' ? 
-      (effectivePlayerRole === 'player1' ? playerName : opponentName) :
-      (effectivePlayerRole === 'player2' ? playerName : opponentName);
-    const playedCardStr = formatCardForMessage(playedCard);
-    
-    // Format table cards for message
-    const tableCardsStr = selectedTableCardsList.map(c => formatCardForMessage(c)).join(' + ');
-    
-    const msgText = `${activePlayerName} captured ${tableCardsStr} (${tableSum}) + ${selectedBuilds.length} builds of ${buildValue} with a ${playedCardStr}`;
-    
-    const updates = {
-      [handKey]: newHand,
-      builds: newBuilds,
-      tableCards: newTableCards,
-      [capturedKey]: newCaptured,
-      currentTurn: nextTurn,
-      lastCapture: playerRole,
-      lastPlayMessage: msgText,
-      lastPlayTimestamp: Date.now()
-    };
-
-    console.log('Sending multiple builds+table capture updates:', updates);
-
-    try {
-      await updateGameState(updates);
-
-      soundManager.play('capture');
-      
-      setSelectedCard(null);
-      setMessage(`You captured ${selectedTableCardsList.length} table card(s) + ${selectedBuilds.length} builds of ${buildValue}!`);
-    } catch (error) {
-      console.error('Error capturing multiple builds with table cards:', error);
       setMessage('Error capturing. Please try again.');
     }
   }
@@ -1844,7 +1672,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       lastPlayTimestamp: Date.now()
     };
     
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
     soundManager.play('capture');
   }
   
@@ -1876,7 +1705,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       lastPlayTimestamp: Date.now()
     };
     
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
     soundManager.play('capture');
   }
   
@@ -1907,7 +1737,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       lastPlayTimestamp: Date.now()
     };
     
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
     soundManager.play('capture');
   }
   
@@ -1942,7 +1773,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       lastPlayTimestamp: Date.now()
     };
     
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
   }
   
   async function executeAiTrail(aiHand) {
@@ -1974,7 +1806,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       lastPlayTimestamp: Date.now()
     };
     
-    await updateGameState(updates);
+    const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+    await update(gameStateRef, updates);
   }
   
   // ==================== END AI LOGIC ====================
@@ -2006,7 +1839,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     const handleNewGame = async () => {
       // Only Player 1 should create new game
-      if (effectivePlayerRole !== 'player1') {
+      if (playerRole !== 'player1') {
         setMessage('Waiting for new game to start...');
         return;
       }
@@ -2037,7 +1870,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         player2TotalScore: 0,
         player1Wins: gameState.player1Wins || 0,  // PRESERVE wins
         player2Wins: gameState.player2Wins || 0,  // PRESERVE wins
-        isAiGame: gameState.isAiGame || isLocalMode,    // PRESERVE AI mode or set for local
         lastCapture: null,
         builds: [],
         roundEnded: false,
@@ -2046,16 +1878,9 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         winner: null
       };
 
-      if (isLocalMode) {
-        // Local mode: Set state directly
-        setGameState(initialState);
-      } else {
-        // Firebase mode: Save to database
-        const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
-        await set(gameStateRef, initialState);
-      }
-      
-      setMessage(`New game started! ${newDealer === 'player1' ? (effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName) : (effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName)} deals first.`);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await set(gameStateRef, initialState);
+      setMessage(`New game started! ${newDealer === 'player1' ? (playerRole === 'player1' ? playerName : opponentName) : (playerRole === 'player2' ? playerName : opponentName)} deals first.`);
     };
 
     return (
@@ -2065,8 +1890,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
           <div className="room-info">
             Room: <strong>{roomCode}</strong>
             <span className="win-counter">
-              {effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
-              {effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: <strong>{gameState.player2Wins || 0}</strong>
+              {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+              {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
             </span>
             <button className="sound-toggle" onClick={toggleSound}>
               {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
@@ -2084,10 +1909,10 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
             <h2>Final Score</h2>
             <div className="score-display">
               <div className={winnerRole === 'player1' ? 'winner' : ''}>
-                {effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: {p1TotalScore}
+                {playerRole === 'player1' ? playerName : opponentName}: {p1TotalScore}
               </div>
               <div className={winnerRole === 'player2' ? 'winner' : ''}>
-                {effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: {p2TotalScore}
+                {playerRole === 'player2' ? playerName : opponentName}: {p2TotalScore}
               </div>
             </div>
           </div>
@@ -2095,8 +1920,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
           <div className="score-section">
             <h3>Current Round Points</h3>
             <div className="score-display">
-              <div>{effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: {p1RoundScore} pts</div>
-              <div>{effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: {p2RoundScore} pts</div>
+              <div>{playerRole === 'player1' ? playerName : opponentName}: {p1RoundScore} pts</div>
+              <div>{playerRole === 'player2' ? playerName : opponentName}: {p2RoundScore} pts</div>
             </div>
           </div>
 
@@ -2104,7 +1929,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
             <h3>Final Breakdown</h3>
             <div className="player-scores">
               <div className="player-score-card">
-                <h4>{effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}</h4>
+                <h4>{playerRole === 'player1' ? playerName : opponentName}</h4>
                 <div className="score-details">
                   {p1Stats.cardCount > p2Stats.cardCount && <div>Most Cards: 3 pts</div>}
                   {p1Stats.spadeCount > p2Stats.spadeCount && <div>Most Spades: 1 pt</div>}
@@ -2118,7 +1943,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
               </div>
 
               <div className="player-score-card">
-                <h4>{effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}</h4>
+                <h4>{playerRole === 'player2' ? playerName : opponentName}</h4>
                 <div className="score-details">
                   {p2Stats.cardCount > p1Stats.cardCount && <div>Most Cards: 3 pts</div>}
                   {p2Stats.spadeCount > p1Stats.spadeCount && <div>Most Spades: 1 pt</div>}
@@ -2157,7 +1982,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     const handleContinue = async () => {
       // Only Player 1 should start new round to avoid conflicts
-      if (effectivePlayerRole !== 'player1') {
+      if (playerRole !== 'player1') {
         setMessage('Waiting for new round to start...');
         return;
       }
@@ -2193,7 +2018,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         winner: null  // Clear winner
       };
 
-      await updateGameState(updates);
+      const gameStateRef = ref(database, `casino-games/${roomCode}/gameState`);
+      await update(gameStateRef, updates);
       setMessage('New round started!');
     };
 
@@ -2204,8 +2030,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
           <div className="room-info">
             Room: <strong>{roomCode}</strong>
             <span className="win-counter">
-              {effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
-              {effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: <strong>{gameState.player2Wins || 0}</strong>
+              {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+              {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
             </span>
             <button className="sound-toggle" onClick={toggleSound}>
               {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
@@ -2221,7 +2047,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
             <h3>Current Round Points</h3>
             <div className="player-scores">
               <div className="player-score-card">
-                <h4>{effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}</h4>
+                <h4>{playerRole === 'player1' ? playerName : opponentName}</h4>
                 <div className="score-details">
                   {p1Stats.cardCount > p2Stats.cardCount && <div>Most Cards: 3 pts</div>}
                   {p1Stats.spadeCount > p2Stats.spadeCount && <div>Most Spades: 1 pt</div>}
@@ -2236,7 +2062,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
               </div>
 
               <div className="player-score-card">
-                <h4>{effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}</h4>
+                <h4>{playerRole === 'player2' ? playerName : opponentName}</h4>
                 <div className="score-details">
                   {p2Stats.cardCount > p1Stats.cardCount && <div>Most Cards: 3 pts</div>}
                   {p2Stats.spadeCount > p1Stats.spadeCount && <div>Most Spades: 1 pt</div>}
@@ -2255,8 +2081,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
           <div className="score-section cumulative">
             <h3>Cumulative Game Score</h3>
             <div className="cumulative-scores">
-              <div>{effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: {p1TotalScore}</div>
-              <div>{effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: {p2TotalScore}</div>
+              <div>{playerRole === 'player1' ? playerName : opponentName}: {p1TotalScore}</div>
+              <div>{playerRole === 'player2' ? playerName : opponentName}: {p2TotalScore}</div>
             </div>
           </div>
 
@@ -2269,11 +2095,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
   }
 
   const myHand = gameState[`${playerRole}Hand`] || [];
-  const opponentHand = gameState[effectivePlayerRole === 'player1' ? 'player2Hand' : 'player1Hand'] || [];
+  const opponentHand = gameState[playerRole === 'player1' ? 'player2Hand' : 'player1Hand'] || [];
   const myCaptured = gameState[`${playerRole}Captured`] || [];
-  const opponentCaptured = gameState[effectivePlayerRole === 'player1' ? 'player2Captured' : 'player1Captured'] || [];
-  const myScore = gameState[effectivePlayerRole === 'player1' ? 'player1Score' : 'player2Score'] || 0;
-  const opponentScore = gameState[effectivePlayerRole === 'player1' ? 'player2Score' : 'player1Score'] || 0;
+  const opponentCaptured = gameState[playerRole === 'player1' ? 'player2Captured' : 'player1Captured'] || [];
+  const myScore = gameState[playerRole === 'player1' ? 'player1Score' : 'player2Score'] || 0;
+  const opponentScore = gameState[playerRole === 'player1' ? 'player2Score' : 'player1Score'] || 0;
   const tableCards = gameState.tableCards || [];
   const builds = gameState.builds || [];
   const isMyTurn = gameState.currentTurn === playerRole;
@@ -2285,8 +2111,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         <div className="room-info">
           Room: <strong>{roomCode}</strong>
           <span className="win-counter">
-            {effectivePlayerRole === 'player1' ? playerName : effectiveOpponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
-            {effectivePlayerRole === 'player2' ? playerName : effectiveOpponentName}: <strong>{gameState.player2Wins || 0}</strong>
+            {playerRole === 'player1' ? playerName : opponentName}: <strong>{gameState.player1Wins || 0}</strong> | {' '}
+            {playerRole === 'player2' ? playerName : opponentName}: <strong>{gameState.player2Wins || 0}</strong>
           </span>
           <button className="sound-toggle" onClick={toggleSound}>
             {soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
@@ -2300,7 +2126,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       <div className="game-board">
         {/* Opponent */}
         <div className="player-section opponent-section">
-          <h2>{effectiveOpponentName} {!isMyTurn && '← TURN'}</h2>
+          <h2>{opponentName} {!isMyTurn && '← TURN'}</h2>
           <div className="hand">
             {opponentHand.map((card, i) => (
               <div key={i} className="card-back"></div>

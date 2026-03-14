@@ -291,6 +291,18 @@ function App() {
     }
   };
 
+  // Handle guest mode (local, no Firebase)
+  const handlePlayGuest = () => {
+    setError(null);
+    setPlayerName('Guest');
+    setPlayerRole('player1');
+    setOpponentName('AI Opponent');
+    setRoomCode('GUEST');  // Dummy room code
+    setGamePhase('playing');
+    
+    // Note: No localStorage or Firebase for guest mode
+  };
+
   // Try to reconnect on page load
   useEffect(() => {
     const savedGame = localStorage.getItem('casinoGame');
@@ -336,6 +348,7 @@ function App() {
           onCreateGame={handleCreateGame}
           onJoinGame={handleJoinGame}
           onPlayAI={handlePlayAI}
+          onPlayGuest={handlePlayGuest}
           error={error}
         />
       )}
@@ -355,6 +368,7 @@ function App() {
           playerName={playerName}
           opponentName={opponentName}
           onLeaveGame={handleLeaveGame}
+          isLocalMode={roomCode === 'GUEST'}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './GameLobby.css';
 
-function GameLobby({ onCreateGame, onJoinGame, onPlayAI, error }) {
+function GameLobby({ onCreateGame, onJoinGame, onPlayAI, onPlayGuest, error }) {
   const [playerName, setPlayerName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +27,11 @@ function GameLobby({ onCreateGame, onJoinGame, onPlayAI, error }) {
     if (!success) {
       // Error will be shown via error prop
     }
+  };
+
+  const handlePlayGuest = () => {
+    // Guest mode: No name required, instant play
+    onPlayGuest();
   };
 
   const handleNewGame = async () => {
@@ -149,6 +154,19 @@ function GameLobby({ onCreateGame, onJoinGame, onPlayAI, error }) {
           >
             {isLoading ? 'Starting...' : 'Play vs AI'}
           </button>
+        </div>
+
+        <div className="divider">OR</div>
+
+        <div className="button-section">
+          <button 
+            className="guest-play-button"
+            onClick={handlePlayGuest}
+            disabled={isLoading}
+          >
+            ⚡ Play Now (Guest Mode)
+          </button>
+          <p className="helper-text">Instant play vs AI - no login required</p>
         </div>
       </div>
     </div>
