@@ -4,12 +4,12 @@ import './Learn.css';
 function Learn({ onBack }) {
   const videos = [
     { id: '3AxQdRhIBpw', title: 'How To Make a Build' },
-    { id: 'bKEEv1S-OAk', title: 'Tutorial Video 2' },
-    { id: 'bNx97uLCz_M', title: 'Tutorial Video 3' },
-    { id: 'smNA_TkVqRk', title: 'Tutorial Video 4' },
-    { id: 'sbfMDl4bwbI', title: 'Tutorial Video 5' },
-    { id: '9NA7uCvfuTw', title: 'Tutorial Video 6' },
-    { id: 's8XFUMMn6W0', title: 'Tutorial Video 7' }
+    { id: 'bKEEv1S-OAk', title: 'Making 2 Builds and Capturing' },
+    { id: 'bNx97uLCz_M', title: 'A-Basic Build 3' },
+    { id: 'smNA_TkVqRk', title: 'A-Basic Capture' },
+    { id: 'sbfMDl4bwbI', title: 'Capturing 2 Cards from the Table' },
+    { id: '9NA7uCvfuTw', title: 'End-of-Round Screen' },
+    { id: 's8XFUMMn6W0', title: 'Unable-To Capture Smaller Card' }
   ];
 
   return (
