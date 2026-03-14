@@ -18,9 +18,28 @@
 
 .lobby-card h1 {
   text-align: center;
-  margin: 0 0 30px 0;
+  margin: 0 0 15px 0;
   color: #333;
   font-size: 2em;
+}
+
+.learn-link-section {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.learn-link-btn {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 1em;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.3s;
+}
+
+.learn-link-btn:hover {
+  color: #5568d3;
 }
 
 .error-message {

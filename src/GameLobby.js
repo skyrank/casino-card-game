@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './GameLobby.css';
 
-function GameLobby({ onCreateGame, onJoinGame, onPlayAI, onPlayGuest, error }) {
+function GameLobby({ onCreateGame, onJoinGame, onPlayAI, onPlayGuest, onLearn, error }) {
   const [playerName, setPlayerName] = useState('');
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -94,6 +94,12 @@ function GameLobby({ onCreateGame, onJoinGame, onPlayAI, onPlayGuest, error }) {
     <div className="lobby-container">
       <div className="lobby-card">
         <h1>🎴 Casino Card Game</h1>
+        
+        <div className="learn-link-section">
+          <button onClick={onLearn} className="learn-link-btn">
+            📖 How to Play
+          </button>
+        </div>
         
         {error && (
           <div className="error-message">

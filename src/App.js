@@ -3,11 +3,12 @@ import './App.css';
 import Game from './Game';
 import GameLobby from './GameLobby';
 import WaitingRoom from './WaitingRoom';
+import Learn from './Learn';
 import { database } from './firebase';
 import { ref, set, onValue, update, remove, get } from 'firebase/database';
 
 function App() {
-  const [gamePhase, setGamePhase] = useState('lobby'); // 'lobby', 'waiting', 'playing'
+  const [gamePhase, setGamePhase] = useState('lobby'); // 'lobby', 'waiting', 'playing', 'learn'
   const [roomCode, setRoomCode] = useState(null);
   const [playerName, setPlayerName] = useState('');
   const [playerRole, setPlayerRole] = useState(null); // 'player1' or 'player2'
@@ -349,8 +350,13 @@ function App() {
           onJoinGame={handleJoinGame}
           onPlayAI={handlePlayAI}
           onPlayGuest={handlePlayGuest}
+          onLearn={() => setGamePhase('learn')}
           error={error}
         />
+      )}
+      
+      {gamePhase === 'learn' && (
+        <Learn onBack={() => setGamePhase('lobby')} />
       )}
       
       {gamePhase === 'waiting' && (
