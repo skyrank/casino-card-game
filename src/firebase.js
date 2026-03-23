@@ -1,3 +1,8 @@
+// Prevent Firebase errors in iframe/ad environments
+if (typeof window !== 'undefined' && window.__CASINO_IN_IFRAME) {
+  console.log('Firebase initializing in iframe mode - using safe defaults');
+}
+
 // Import the functions you need from the SDKs you need
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';

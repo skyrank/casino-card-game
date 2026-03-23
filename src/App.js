@@ -7,6 +7,8 @@ import Learn from './Learn';
 import { database } from './firebase';
 import { ref, set, onValue, update, remove, get } from 'firebase/database';
 
+
+
 function App() {
   const [gamePhase, setGamePhase] = useState('lobby'); // 'lobby', 'waiting', 'playing', 'learn'
   const [roomCode, setRoomCode] = useState(null);
