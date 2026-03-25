@@ -6,8 +6,7 @@ import WaitingRoom from './WaitingRoom';
 import Learn from './Learn';
 import { database } from './firebase';
 import { ref, set, onValue, update, remove, get } from 'firebase/database';
-
-
+import { pokiSdk } from './pokiSdk';
 
 function App() {
   const [gamePhase, setGamePhase] = useState('lobby'); // 'lobby', 'waiting', 'playing', 'learn'
@@ -308,6 +307,9 @@ function App() {
 
   // Try to reconnect on page load
   useEffect(() => {
+    // Initialize Poki SDK
+    pokiSdk.init().catch(err => console.error('Poki SDK init failed:', err));
+    
     const savedGame = localStorage.getItem('casinoGame');
     if (savedGame) {
       try {

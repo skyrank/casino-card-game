@@ -5,7 +5,6 @@ import './Game.css';
 import { database } from './firebase';
 import { ref, set, onValue, update, get } from 'firebase/database';
 import soundManager from './soundManager';
-import { pokiSdk } from './pokiSdk';
 
 function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isLocalMode = false }) {
   const [gameState, setGameState] = useState(null);
@@ -165,9 +164,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     }
     
     console.log('Starting new game, isAiGame:', isAiGame, 'isLocalMode:', isLocalMode);
-
-    // Poki SDK: Notify gameplay start
-    pokiSdk.gameplayStart();
 
     const initialState = {
       deck: remainingDeck,
@@ -1060,9 +1056,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
       return;
     }
 
-    // Poki SDK: Notify gameplay stopped (round ended)
-    pokiSdk.gameplayStop();
-
     console.log('gameState:', {
       tableCards: gameState.tableCards,
       player1Hand: gameState.player1Hand,
@@ -1171,11 +1164,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     };
 
     await updateGameState(updates);
-
-    // Poki SDK: Show commercial break between rounds (good ad opportunity)
-    if (!gameOver) {
-      await pokiSdk.commercialBreak();
-    }
 
     setMessage(`Round Over! ${playerName}: ${effectivePlayerRole === 'player1' ? p1Score : p2Score} pts | ${effectiveOpponentName}: ${effectivePlayerRole === 'player1' ? p2Score : p1Score} pts`);
   }
@@ -2173,9 +2161,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
         setMessage('Waiting for new round to start...');
         return;
       }
-      
-      // Poki SDK: Resume gameplay for next round
-      pokiSdk.gameplayStart();
       
       // Start new round
       const deck = shuffleDeck(createDeck());
