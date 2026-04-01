@@ -1,5 +1,6 @@
 {
   "name": "casino-card-game",
+  "homepage": ".",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
