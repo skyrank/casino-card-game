@@ -1172,8 +1172,8 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     await updateGameState(updates);
 
-    // Poki SDK: Show commercial break between rounds (good ad opportunity)
-    if (!gameOver) {
+    // Poki SDK: Show commercial break at game end only (not between rounds)
+    if (gameOver) {
       await pokiSdk.commercialBreak();
     }
 

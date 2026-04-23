@@ -12,6 +12,7 @@
   font-family: Arial, sans-serif;
   font-weight: bold;
   position: relative;
+  overflow: hidden;
 }
 
 .card-corner {
@@ -54,4 +55,63 @@
   content: '🂠';
   font-size: 60px;
   color: rgba(255, 255, 255, 0.3);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MOBILE — card dimensions defined HERE so they win the cascade
+   (Card.css loads after Game.css, so this is the authoritative
+   source for card sizing on mobile)
+   ───────────────────────────────────────────────────────────── */
+@media screen and (max-width: 768px) {
+  .card {
+    width: 70px;
+    height: 98px;
+    padding: 5px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .card-back {
+    width: 70px;
+    height: 98px;
+    border-radius: 6px;
+  }
+
+  .card-corner {
+    font-size: 10px;
+  }
+
+  .card-center {
+    font-size: 36px;
+  }
+
+  .card-back::before {
+    font-size: 44px;
+  }
+}
+
+/* Extra small phones */
+@media screen and (max-width: 480px) {
+  .card {
+    width: 58px;
+    height: 82px;
+    padding: 4px;
+  }
+
+  .card-back {
+    width: 58px;
+    height: 82px;
+  }
+
+  .card-corner {
+    font-size: 9px;
+  }
+
+  .card-center {
+    font-size: 28px;
+  }
+
+  .card-back::before {
+    font-size: 36px;
+  }
 }

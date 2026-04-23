@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { margin: 0; padding: 20px; background: #f0f0f0; }
+.banner {
+  width: 960px;
+  height: 300px;
+  background: linear-gradient(135deg, #1e5128 0%, #2d6a4f 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 40px 60px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.05) 0%, transparent 50%);
+}
+
+.title-section {
+  flex: 1;
+  z-index: 2;
+}
+
+.title {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 72px;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  letter-spacing: 2px;
+}
+
+.subtitle {
+  font-family: 'Georgia', serif;
+  font-size: 28px;
+  color: #ffd700;
+  margin: 8px 0 0 4px;
+  font-style: italic;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.cards-section {
+  display: flex;
+  gap: 20px;
+  z-index: 2;
+}
+
+.card {
+  width: 100px;
+  height: 140px;
+  background: white;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border: 2px solid #e0e0e0;
+  transform: rotate(-5deg);
+  transition: transform 0.3s;
+}
+
+.card:nth-child(2) {
+  transform: rotate(0deg) translateY(-10px);
+}
+
+.card:nth-child(3) {
+  transform: rotate(5deg);
+}
+
+.card-rank {
+  font-family: 'Georgia', serif;
+  font-size: 48px;
+  font-weight: bold;
+  margin: 0;
+  line-height: 1;
+}
+
+.card-suit {
+  font-size: 40px;
+  margin: 4px 0 0 0;
+}
+
+.red { color: #dc143c; }
+.black { color: #000; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="title-section">
+    <h1 class="title">CASINO</h1>
+    <p class="subtitle">Build • Capture • Win</p>
+  </div>
+  <div class="cards-section">
+    <div class="card">
+      <div class="card-rank red">10</div>
+      <div class="card-suit red">♦</div>
+    </div>
+    <div class="card">
+      <div class="card-rank black">2</div>
+      <div class="card-suit black">♠</div>
+    </div>
+    <div class="card">
+      <div class="card-rank black">A</div>
+      <div class="card-suit black">♠</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Take screenshot after render
+setTimeout(() => {
+  document.title = 'Casino Card Game Banner - Ready for Screenshot';
+}, 100);
+</script>
+</body>
+</html>
