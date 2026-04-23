@@ -260,8 +260,15 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     const tableCards = gameState.tableCards || [];
     const selectedIndices = selectedTableCards.map(tc => tc.index).sort();
 
+    // DEBUG: Face card capture tracing
+    console.log('=== CAPTURE DEBUG ===');
+    console.log('Played card rank:', playedCard.rank, '| Is face card:', playedCard.rank > 10);
+    console.log('Selected table cards:', selectedIndices.map(i => tableCards[i]).map(c => c.rank + c.suit));
+    console.log('Selected builds count:', selectedBuilds.length);
+
     // PRIORITY 1: Check if builds AND table cards are BOTH selected (combined capture)
     if (selectedBuilds.length > 0 && selectedIndices.length > 0) {
+      console.log('>>> PRIORITY 1 path: builds + table cards');
       // Allow multiple builds + table cards if they all equal the played card value
       const buildValue = selectedBuilds[0].build.value;
       
@@ -300,6 +307,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // PRIORITY 2: Check if ONLY builds are selected (no table cards)
     if (selectedBuilds.length > 0) {
+      console.log('>>> PRIORITY 2 path: builds only');
       // Validate all builds have same value and match the played card
       const buildValue = selectedBuilds[0].build.value;
       
@@ -324,6 +332,7 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
 
     // PRIORITY 3: Check for ONLY table card captures (no builds)
     if (selectedIndices.length === 0) {
+      console.log('>>> PRIORITY 3 path: no cards selected, showing hints');
       // No cards selected - show available captures
       const validCombos = findCapturableCombinations(tableCards, playedCard.rank);
       if (validCombos.length > 0) {
@@ -362,8 +371,11 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     }
 
     // Check if selected cards can be partitioned into valid combinations
+    console.log('>>> PRIORITY 4 path: pure table card capture');
     const selectedCards = selectedIndices.map(idx => tableCards[idx]);
+    console.log('Calling canPartitionIntoValidCombinations with ranks:', selectedCards.map(c => c.rank), 'targetRank:', playedCard.rank);
     const canCapture = canPartitionIntoValidCombinations(selectedCards, playedCard.rank);
+    console.log('canCapture result:', canCapture);
 
     if (canCapture) {
       // Valid capture
