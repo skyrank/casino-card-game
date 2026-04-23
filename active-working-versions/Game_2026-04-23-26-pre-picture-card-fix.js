@@ -379,10 +379,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     // Edge case: empty selection
     if (cards.length === 0) return false;
 
-    // CASINO RULE: Face cards (J=11, Q=12, K=13) can only capture exact matches, never combinations
-    if (targetRank > 10 && cards.length > 1) return false;
-    if (targetRank > 10 && cards.length === 1) return cards[0].rank === targetRank;
-
     // Try to partition cards into groups where each group sums to targetRank
     return tryPartition(cards, targetRank, []);
   }
@@ -441,8 +437,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
     });
 
     // 2. Combining - multiple cards that sum to playedRank
-    // CASINO RULE: Face cards cannot capture via combinations, only exact matches
-    if (playedRank <= 10) {
     const n = tableCards.length;
     for (let mask = 1; mask < (1 << n); mask++) {
       const subset = [];
@@ -466,7 +460,6 @@ function Game({ roomCode, playerRole, playerName, opponentName, onLeaveGame, isL
           });
         }
       }
-    }
     }
 
     // 3. Capturing builds
